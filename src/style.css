@@ -1,0 +1,162 @@
+:root{
+  --bg-white: #ffffff;
+  --dark-hash: #EFEFEF;
+  --accent-color: #EBC755;
+  --gradie-light: #E3AD23;
+  --black-dark: #252525;
+ 
+}
+
+.hash{
+  background-color: var(--dark-hash);
+}
+.white{
+   background-color: var(--bg-white);
+}
+
+ .button{
+  color: var(--dark-color);
+  background-color: var( --dark-hash);
+  box-shadow: 3px 3px 12px rgba(20, 15, 31, 0.1),
+              -3px -3px 12px rgba(255, 255, 255, 0.9);
+}
+.button:hover{
+  color: var(--dark-color);
+  background-color: var( --dark-hashr);
+  box-shadow: 5px 4px 8px rgba(20, 15, 31, 0.2),
+              -5px -4px 8px rgba(255, 255, 255, 0.6);
+}
+.button:active{
+  box-shadow:  inset 2px 2px 6px rgba(20, 15, 31, 0.3),
+                     -4px -4px 8px rgba(255, 255, 255, 0.4);
+}
+ /* .butto{
+  
+  background-color: var( --dark-hash);
+  box-shadow: 3px 3px 12px rgba(20, 15, 31, 0.1),
+              -3px -3px 12px rgba(255, 255, 255, 0.9);
+} */
+.butto:hover{
+  box-shadow: 5px 4px 8px rgba(20, 15, 31, 0.2),
+              -5px -4px 8px rgba(255, 255, 255, 0.6);
+}
+.butto:active{
+  box-shadow:  inset 2px 2px 6px rgba(20, 15, 31, 0.3),
+                     -4px -4px 8px rgba(255, 255, 255, 0.4);
+}
+.butt:hover{
+
+
+  box-shadow: 5px 4px 8px rgba(20, 15, 31, 0.2),
+              -5px -4px 8px rgba(255, 255, 255, 0.6);
+}
+
+.butt:active{
+  box-shadow:  inset 2px 2px 6px rgba(20, 15, 31, 0.3),
+                     -4px -4px 8px rgba(255, 255, 255, 0.4);
+}
+.has{
+   background-color: var(--dark-hash);
+     box-shadow: 5px 4px 8px rgba(20, 15, 31, 0.2),
+              -5px -4px 8px rgba(255, 255, 255, 0.6);
+}
+.input-label label{
+  color: var(--dark-color);
+  margin-bottom: 8px;
+}
+.body input{
+  color: var(--dark-color);
+  transition: all 0.2s ease;
+
+  box-shadow: 5px 5px 10px rgba(20, 15, 31, 0.05),
+               -5px -5px 10px rgba(255, 255, 255, 0.6);
+}
+ 
+.b{
+  background-color: var(--dark-hash);
+  overflow-x: scroll;
+  scrollbar-width: 200px;
+  border: 1px solid rgb(219, 215, 215);
+    box-shadow:  1px 1px 5px rgba(20, 15,31, 0.1),
+                -1px -1px 5px rgba(255, 255, 255, 0.7);
+}
+.b::-webkit-scrollbar{
+  display: none;
+ }
+ .c{
+  background-color: var(--dark-hash);
+  border: 1px solid rgb(219, 215, 215);
+    box-shadow:  1px 1px 5px rgba(20, 15,31, 0.1),
+                -1px -1px 5px rgba(255, 255, 255, 0.7);
+}
+
+.e::-webkit-scrollbar{
+  display: none;
+ }
+
+ 
+.containe {
+  background-color: var(--bg-color);
+  box-shadow:  10px 10px 20px rgba(20, 15,31, 0.1),
+                -10px -10px 20px rgba(255, 255, 255, 0.7);
+  overflow-y: scroll;
+  scrollbar-width: none;
+
+  
+}
+.contai {
+  background-color: var(--bg-color);
+
+  overflow-y: scroll;
+  scrollbar-width: none;
+
+}
+.contai::-webkit-scrollbar{
+  display: none;
+}
+
+.cont{
+  overflow-y: scroll;
+  scrollbar-width: none;
+
+}
+.cont::-webkit-scrollbar{
+  display: none;
+}
+.out{
+  background-color: var(--accent-color);
+  color: var(--bg-white);
+    border: 1px solid rgb(219, 215, 215);
+    box-shadow:  1px 1px 5px rgba(20, 15,31, 0.1),
+                -1px -1px 5px rgba(255, 255, 255, 0.7);
+  
+}
+.out:hover{
+  background-color: var(--accent-color);
+  color: var(--bg-white);
+  box-shadow: 1px 1px 4px rgba(122, 120, 8, 0.2),
+              -1px -1px 4px rgba(225, 234, 55, 0.6);
+}
+.out:active{
+  box-shadow:  inset 2px 2px 6px rgba(203, 206, 33, 0.3),
+               inset -2px -2px 6px rgba(186, 155, 1, 0.4);
+}
+
+.containe::-webkit-scrollbar{
+  display: none;
+}
+
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background-color: #f0f0f0;
+}
+
+.chat-header {
+    padding: 10px;
+    background-color: #6200ea;
+    color: white;
+    text-align: center;
+    font-size: 20px;
+}
