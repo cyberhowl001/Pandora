@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 import {
   Shield, Users, Bell, Trash2, CheckCircle, XCircle,
-  LogOut, Flag, Eye, EyeOff, MessageSquare, RefreshCw, ArrowLeft, UsersRound
+  LogOut, Flag, Eye, EyeOff, MessageSquare, RefreshCw, ArrowLeft
 } from "lucide-react";
 
 const ADMIN_USERNAME = "Alkali Jesse";
@@ -19,10 +19,8 @@ export default function AdminDashboard({ onBack }) {
   const [allUsers, setAllUsers] = useState([]);
   const [reports, setReports] = useState([]);
   const [notifications, setNotifications] = useState([]);
-  const [pendingGroups, setPendingGroups] = useState([]);
   const [loading, setLoading] = useState(false);
   const [rejectMsg, setRejectMsg] = useState({});
-  const [groupRejectMsg, setGroupRejectMsg] = useState({});
   const [editUser, setEditUser] = useState(null);
   const [editForm, setEditForm] = useState({});
 
@@ -35,19 +33,16 @@ export default function AdminDashboard({ onBack }) {
       { data: all },
       { data: reps },
       { data: notifs },
-      { data: groups },
     ] = await Promise.all([
       supabase.from("users").select("*").eq("status", "pending").order("created_at", { ascending: false }),
       supabase.from("users").select("*").order("created_at", { ascending: false }),
       supabase.from("reports").select("*").order("created_at", { ascending: false }),
       supabase.from("admin_notifications").select("*").order("created_at", { ascending: false }),
-      supabase.from("groups").select("*, group_members(count)").eq("status", "pending").order("created_at", { ascending: false }),
     ]);
     setPendingUsers(pending || []);
     setAllUsers(all || []);
     setReports(reps || []);
     setNotifications(notifs || []);
-    setPendingGroups(groups || []);
     setLoading(false);
   };
 
@@ -81,13 +76,12 @@ export default function AdminDashboard({ onBack }) {
     loadAll();
   };
 
-  const deleteUser = async (userId) => {
-    if (!confirm("Permanently delete this user and all their data?")) return;
-    await supabase.from("direct_messages").delete().or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
-    await supabase.from("messages").delete().eq("user_id", userId);
+  const deleteUser = async (userId, username) => {
+    if (!window.confirm("Permanently delete this user and all their data?")) return;
     await supabase.from("pantweets").delete().eq("user_id", userId);
     await supabase.from("followers").delete().or(`follower_id.eq.${userId},following_id.eq.${userId}`);
     await supabase.from("reports").delete().eq("reporter_id", userId);
+    if (username) await supabase.from("reports").delete().eq("reported_username", username);
     await supabase.from("users").delete().eq("id", userId);
     loadAll();
   };
@@ -101,30 +95,6 @@ export default function AdminDashboard({ onBack }) {
       status: editForm.status,
     }).eq("id", editUser.id);
     setEditUser(null);
-    loadAll();
-  };
-
-  // ── Group actions ───────────────────────────────────────────────────────────
-
-  const approveGroup = async (group) => {
-    await supabase.from("groups").update({ status: "approved" }).eq("id", group.id);
-    await supabase.from("admin_notifications").insert([{
-      type: "group_approved",
-      ref_id: group.id,
-      message: `Group "${group.name}" has been approved.`,
-    }]);
-    loadAll();
-  };
-
-  const rejectGroup = async (group) => {
-    const msg = groupRejectMsg[group.id] || "";
-    await supabase.from("groups").update({ status: "rejected" }).eq("id", group.id);
-    await supabase.from("admin_notifications").insert([{
-      type: "group_rejected",
-      ref_id: group.id,
-      message: `Group "${group.name}" was rejected.${msg ? ` Reason: ${msg}` : ""}`,
-    }]);
-    setGroupRejectMsg((p) => { const n = { ...p }; delete n[group.id]; return n; });
     loadAll();
   };
 
@@ -196,7 +166,6 @@ export default function AdminDashboard({ onBack }) {
 
   const tabs = [
     { key: "pending", label: "Pending Users", count: pendingUsers.length, icon: <Bell size={14} /> },
-    { key: "groups", label: "Groups", count: pendingGroups.length, icon: <UsersRound size={14} /> },
     { key: "all", label: "All Users", count: allUsers.length, icon: <Users size={14} /> },
     { key: "reports", label: "Reports", count: reports.length, icon: <Flag size={14} /> },
     { key: "notifications", label: "Inbox", count: unreadCount, icon: <MessageSquare size={14} /> },
@@ -273,56 +242,6 @@ export default function AdminDashboard({ onBack }) {
           </div>
         )}
 
-        {/* ✅ PENDING GROUPS */}
-        {tab === "groups" && !loading && (
-          <div className="space-y-3">
-            {pendingGroups.length === 0 && <EmptyState icon={<UsersRound size={32} />} text="No groups pending approval" />}
-            {pendingGroups.map((group) => (
-              <div key={group.id} className="bg-[#1a1a1a] border border-white/5 rounded-2xl p-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-amber-400/20 flex items-center justify-center font-black text-amber-400 text-lg shrink-0">
-                    {group.name[0].toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-white">{group.name}</p>
-                    {group.description && <p className="text-xs text-gray-400 mt-0.5">{group.description}</p>}
-                    <p className="text-xs text-gray-500 mt-1">
-                      Created {new Date(group.created_at).toLocaleDateString()} ·{" "}
-                      {group.group_members?.[0]?.count ?? "?"} member(s)
-                    </p>
-                  </div>
-                  <span className="text-xs px-2 py-1 rounded-full bg-amber-400/10 text-amber-400 font-bold">
-                    pending
-                  </span>
-                </div>
-
-                <div className="mt-3 space-y-2">
-                  <input
-                    value={groupRejectMsg[group.id] || ""}
-                    onChange={(e) => setGroupRejectMsg((p) => ({ ...p, [group.id]: e.target.value }))}
-                    placeholder="Rejection reason (optional)…"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none text-white placeholder-gray-600"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => approveGroup(group)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-green-400 text-sm font-bold transition-all"
-                    >
-                      <CheckCircle size={14} /> Approve
-                    </button>
-                    <button
-                      onClick={() => rejectGroup(group)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-sm font-bold transition-all"
-                    >
-                      <XCircle size={14} /> Reject
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* ALL USERS */}
         {tab === "all" && !loading && (
           <div className="space-y-3">
@@ -339,7 +258,7 @@ export default function AdminDashboard({ onBack }) {
                       Edit
                     </button>
                     <button
-                      onClick={() => deleteUser(user.id)}
+                      onClick={() => deleteUser(user.id, user.username)}
                       className="px-2.5 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-xs font-bold transition-all flex items-center gap-1"
                     >
                       <Trash2 size={12} /> Delete
@@ -365,9 +284,21 @@ export default function AdminDashboard({ onBack }) {
                     <p className="text-xs text-gray-600 mt-1">{new Date(r.created_at).toLocaleString()}</p>
                   </div>
                 </div>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${r.status === "reviewed" ? "bg-green-500/10 text-green-400" : "bg-amber-400/10 text-amber-400"}`}>
-                  {r.status}
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${r.status === "reviewed" ? "bg-green-500/10 text-green-400" : "bg-amber-400/10 text-amber-400"}`}>
+                    {r.status}
+                  </span>
+                  {allUsers.some((u) => u.username === r.reported_username) ? (
+                    <button
+                      onClick={() => deleteUser(allUsers.find((u) => u.username === r.reported_username).id, r.reported_username)}
+                      className="px-2.5 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-xs font-bold transition-all flex items-center gap-1"
+                    >
+                      <Trash2 size={12} /> Delete account
+                    </button>
+                  ) : (
+                    <span className="text-xs text-gray-600">Account already deleted</span>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -432,9 +363,6 @@ function UserInfo({ user, showStatus }) {
   const statusColors = { accepted: "text-green-400", pending: "text-amber-400", rejected: "text-red-400" };
   return (
     <div className="flex items-center gap-3">
-      <div className="w-10 h-10 rounded-full overflow-hidden bg-amber-400/20 flex items-center justify-center font-black text-amber-400 shrink-0">
-        {user.avatar_url ? <img src={user.avatar_url} alt="" className="w-full h-full object-cover" /> : user.username?.[0]?.toUpperCase()}
-      </div>
       <div>
         <p className="font-bold text-sm text-white">@{user.username} <span className="text-gray-500 font-normal text-xs">— {user.surname} {user.other_name}</span></p>
         <p className="text-xs text-gray-500">{user.phone || "No phone"} · {new Date(user.created_at).toLocaleDateString()}</p>

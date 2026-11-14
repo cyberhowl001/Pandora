@@ -1,16 +1,23 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useAuth } from "./AuthContext";
 import { supabase } from "../supabaseClient";
-import { Eye, EyeOff, Upload, Lock, Phone, AtSign, ChevronRight, CheckCircle, Shield } from "lucide-react";
+import { Eye, EyeOff, Lock, Phone, AtSign, ChevronRight, CheckCircle, Shield } from "lucide-react";
 
-export default function SignIn({ onSuccess, onGoToAdmin }) {
+// "+234 801 234 5678", "0801-234-5678" and "2348012345678" all count as the same number
+const normalizePhone = (p) => {
+  let d = p.trim().replace(/[^\d+]/g, "");
+  if (d.startsWith("+234")) d = "0" + d.slice(4);
+  else if (d.startsWith("234")) d = "0" + d.slice(3);
+  return d.replace(/\D/g, "");
+};
+
+export default function SignIn({ onGoToAdmin }) {
   const { login } = useAuth();
   const [mode, setMode] = useState("login"); // 'login' | 'register'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const fileInputRef = useRef(null);
 
   // Login form
   const [loginData, setLoginData] = useState({ username: "", password: "" });
@@ -22,33 +29,22 @@ export default function SignIn({ onSuccess, onGoToAdmin }) {
     username: "",
     password: "",
     phone: "",
-    avatar: null,
-    avatarPreview: null,
   });
-
-  const handleAvatarSelect = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () =>
-      setRegData((p) => ({ ...p, avatar: file, avatarPreview: reader.result }));
-    reader.readAsDataURL(file);
-  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const { data, error: err } = await login(loginData.username, loginData.password);
+    const { error: err } = await login(loginData.username, loginData.password);
     setLoading(false);
-    if (err) { setError(err); return; }
-    onSuccess?.();
+    if (err) setError(err);
+    // On success AuthContext sets currentUser and App routes to PanTweet.
   };
 
   const handleRegister = async (e) => {
     e.preventDefault();
     setError("");
-    if (!regData.surname || !regData.other_name || !regData.username || !regData.password) {
+    if (!regData.surname || !regData.other_name || !regData.username || !regData.password || !regData.phone.trim()) {
       setError("Please fill in all required fields.");
       return;
     }
@@ -56,14 +52,31 @@ export default function SignIn({ onSuccess, onGoToAdmin }) {
       setError("Username cannot contain spaces.");
       return;
     }
+    const phone = normalizePhone(regData.phone);
+    if (phone.length < 7) {
+      setError("Please enter a valid phone number.");
+      return;
+    }
     setLoading(true);
+
+    // One account per phone number
+    const { data: phoneUsed } = await supabase
+      .from("users")
+      .select("id")
+      .in("phone", [phone, regData.phone.trim()])
+      .limit(1);
+    if (phoneUsed && phoneUsed.length > 0) {
+      setError("This number has already been used.");
+      setLoading(false);
+      return;
+    }
 
     // Check username uniqueness
     const { data: existing } = await supabase
       .from("users")
       .select("id")
       .eq("username", regData.username)
-      .single();
+      .maybeSingle();
 
     if (existing) {
       setError("Username already taken. Choose another.");
@@ -71,25 +84,18 @@ export default function SignIn({ onSuccess, onGoToAdmin }) {
       return;
     }
 
-    // Convert avatar to base64 if provided
-    let avatarUrl = null;
-    if (regData.avatar) {
-      avatarUrl = regData.avatarPreview; // base64 string
-    }
-
-    // Insert pending user
+    // Create the account: active immediately, no admin approval needed
     const { error: insertErr } = await supabase.from("users").insert([{
       surname: regData.surname,
       other_name: regData.other_name,
       username: regData.username,
       password_hash: regData.password, // In production: hash via Edge Fn
-      phone: regData.phone,
-      avatar_url: avatarUrl,
-      status: "pending",
+      phone,
+      status: "accepted",
     }]);
 
     if (insertErr) {
-      setError("Registration failed. Please try again.");
+      setError(insertErr.code === "23505" && /phone/i.test(insertErr.message || "") ? "This number has already been used." : "Registration failed. Please try again.");
       setLoading(false);
       return;
     }
@@ -99,36 +105,40 @@ export default function SignIn({ onSuccess, onGoToAdmin }) {
       .from("users")
       .select("id")
       .eq("username", regData.username)
-      .single();
+      .maybeSingle();
 
     if (newUser) {
       await supabase.from("admin_notifications").insert([{
         type: "new_user",
         ref_id: newUser.id,
-        message: `New registration request from @${regData.username}`,
+        message: `New account created: @${regData.username}`,
       }]);
     }
 
     setLoading(false);
     setSuccess(
-      "Registration submitted! Please wait for admin approval before logging in."
+      "Account created! You can log in now."
     );
+    setLoginData({ username: regData.username, password: "" });
     setMode("login");
   };
 
   return (
-    <div className="min-h-screen w-full flex bg-[#0d0d0d] font-sans">
+    <div className="h-screen w-full flex bg-[#0d0d0d] font-sans">
       {/* Left Panel */}
-      <div className="hidden lg:flex w-1/2 flex-col justify-center items-center bg-gradient-to-br from-amber-500/10 via-[#0d0d0d] to-amber-900/10 border-r border-white/5 p-12">
-        <img src="panda.png" alt="Pandora" className="w-24 mb-6 drop-shadow-2xl" />
+      <div className="hidden lg:flex w-1/2 flex-col justify-center items-center bg-linear-to-br from-amber-500/10 via-[#0d0d0d] to-amber-900/10 border-r border-white/5 p-12">
+        <img src="/panda.png" alt="Pandora" className="w-24 mb-6 drop-shadow-2xl" />
         <h1 className="text-5xl font-black text-white tracking-tight mb-3">
           Pan<span className="text-amber-400">dora</span>
         </h1>
         <p className="text-gray-400 text-center text-sm leading-relaxed max-w-xs">
-          Connect. Chat. Share moments that matter — before they fade.
+          Share moments that matter — before they fade.
+        </p>
+             <p className="text-gray-400 text-center text-sm leading-relaxed max-w-xs">
+          Be connected — share.
         </p>
         <div className="mt-10 grid grid-cols-2 gap-3 w-full max-w-xs">
-          {["Group Chat", "PanTweet", "Direct DMs", "Following"].map((f) => (
+          {["PanTweet", "Following"].map((f) => (
             <div key={f} className="bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-xs text-gray-300 font-medium text-center">
               {f}
             </div>
@@ -141,7 +151,7 @@ export default function SignIn({ onSuccess, onGoToAdmin }) {
         <div className="w-full max-w-sm">
           {/* Logo mobile */}
           <div className="flex items-center gap-2 mb-8 lg:hidden">
-            <img src="panda.png" alt="" className="w-8" />
+            <img src="/panda.png" alt="" className="w-8" />
             <span className="text-white font-black text-2xl">
               Pan<span className="text-amber-400">dora</span>
             </span>
@@ -216,22 +226,6 @@ export default function SignIn({ onSuccess, onGoToAdmin }) {
           {/* REGISTER FORM */}
           {mode === "register" && (
             <form onSubmit={handleRegister} className="space-y-3">
-              {/* Avatar picker */}
-              <div className="flex flex-col items-center mb-2">
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-20 h-20 rounded-full bg-white/5 border-2 border-dashed border-amber-400/40 flex items-center justify-center cursor-pointer overflow-hidden hover:border-amber-400 transition-all"
-                >
-                  {regData.avatarPreview ? (
-                    <img src={regData.avatarPreview} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <Upload size={20} className="text-amber-400/60" />
-                  )}
-                </div>
-                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarSelect} />
-                <p className="text-xs text-gray-500 mt-1">Profile picture (optional)</p>
-              </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <Field placeholder="Surname *" value={regData.surname} onChange={(v) => setRegData((p) => ({ ...p, surname: v }))} />
                 <Field placeholder="Other name *" value={regData.other_name} onChange={(v) => setRegData((p) => ({ ...p, other_name: v }))} />
@@ -244,7 +238,7 @@ export default function SignIn({ onSuccess, onGoToAdmin }) {
               />
               <Field
                 icon={<Phone size={15} />}
-                placeholder="Phone number"
+                placeholder="Phone number *"
                 value={regData.phone}
                 onChange={(v) => setRegData((p) => ({ ...p, phone: v }))}
                 type="tel"
@@ -260,16 +254,17 @@ export default function SignIn({ onSuccess, onGoToAdmin }) {
                 disabled={loading}
                 className="w-full py-3 bg-amber-400 hover:bg-amber-500 text-black font-bold rounded-2xl transition-all flex items-center justify-center gap-2 disabled:opacity-60"
               >
-                {loading ? "Submitting…" : "Request Account"}
+                {loading ? "Creating account…" : "Create Account"}
               </button>
               <p className="text-xs text-gray-500 text-center">
-                After registering, your account needs admin approval before you can sign in.
+                Your account is ready as soon as you register. You can sign in right away.
               </p>
             </form>
           )}
 
           <p className="text-xs text-gray-600 text-center mt-8">
-            Created by Cyberhowl (Alkali Jesse Uchubiyojo)
+               Created by Cyberhowl (Explore $Update)
+            {/* Created by Cyberhowl (Alkali Jesse Uchubiyojo) */}
           </p>
         </div>
       </div>
