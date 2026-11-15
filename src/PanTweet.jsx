@@ -13,7 +13,7 @@ import CreatePost from "./CreatePost";
 import Drawer from "./Drawer";
 import SearchTab from "./SearchTab";
 import { SettingsSheet } from "./Settings";
-import { RulesSheet, ThemeSheet } from "./Info";
+import { RulesSheet, ThemeSheet } from "./info";
 import { useIsDesktop } from "./utils";
 
 const ICON = "text-violet-500"; // icons stay purple in every theme
