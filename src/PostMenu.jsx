@@ -1,4 +1,4 @@
-import { Activity, Flag, UserX, UserPlus, UserMinus, Heart, MessageCircle, Repeat, Eye, X } from "lucide-react";
+import { Activity, Flag, UserX, UserPlus, UserMinus, Heart, MessageCircle, Repeat, Eye, X, Megaphone, Gift } from "lucide-react";
 import { useAuth } from "./AuthContext";
 import { useFollows } from "./FollowContext";
 import { usePosts } from "./PostsContext";
@@ -10,7 +10,7 @@ import { displayName, fmt, same } from "./utils";
 export function PostMenu() {
   const { t } = useTheme();
   const { currentUser } = useAuth();
-  const { menuPost: post, closePostMenu, users, setInteractionsPost, setReportReq } = usePosts();
+  const { menuPost: post, closePostMenu, users, setInteractionsPost, setReportReq, setPromoTarget, setTipTarget } = usePosts();
   const { isFollowing, toggleFollow } = useFollows();
 
   const own = same(post.user_id, currentUser.id);
@@ -20,6 +20,8 @@ export function PostMenu() {
 
   const items = [
     [Activity, "View post interactions", run(() => setInteractionsPost(post))],
+    ...(own && currentUser.account_type === "business" ? [[Megaphone, "Promote this post", run(() => setPromoTarget(post))]] : []),
+    ...(!own && author.monetized ? [[Gift, "Tip this creator", run(() => setTipTarget({ user: author, post }))]] : []),
     ...(own ? [] : [
       [Flag, "Report post", run(() => setReportReq({ user: author, post })), true],
       [UserX, `Report @${author.username}`, run(() => setReportReq({ user: author })), true],
@@ -30,18 +32,18 @@ export function PostMenu() {
   ];
 
   return (
-    <div className="fixed inset-0 z-80 flex items-end justify-center" onClick={closePostMenu}>
+    <div className="fixed inset-0 z-[80] flex items-end justify-center" onClick={closePostMenu}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`relative w-full  max-w-xl rounded-t-3xl border-t p-3 pb-6 space-y-1 ${t.page} ${t.text} ${t.line}`}
+        className={`relative w-full max-w-xl rounded-t-3xl border-t p-3 pb-6 space-y-1 ${t.page} ${t.text} ${t.line}`}
       >
-        <div className="flex justify-center pb-1"><span className="w-60 h-1 rounded-full bg-gray-400/50" /></div>
+        <div className="flex justify-center pb-1"><span className="w-10 h-1.5 rounded-full bg-gray-400/50" /></div>
         {items.map(([Icon, label, action, danger]) => (
           <button
             key={label}
             onClick={action}
-            className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left font-bold cursor-pointer text-sm ${danger ? "text-red-400" : ""}`}
+            className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left font-bold text-sm ${t.chip} ${danger ? "text-red-400" : ""}`}
           >
             <Icon size={18} className={danger ? "" : t.accentText} /> {label}
           </button>
@@ -66,7 +68,7 @@ export function InteractionsSheet() {
   ];
 
   return (
-    <div className="fixed inset-0 z-75 flex items-end justify-center" onClick={close}>
+    <div className="fixed inset-0 z-[75] flex items-end justify-center" onClick={close}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div
         onClick={(e) => e.stopPropagation()}

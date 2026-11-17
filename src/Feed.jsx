@@ -1,11 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { MoreVertical, Repeat } from "lucide-react";
 import { useAuth } from "./AuthContext";
 import { usePosts } from "./PostsContext";
 import { useTheme } from "./theme";
-import { Avatar, RichText } from "./ui";
+import { Avatar } from "./ui";
 import { MediaSlider, RepostRef, ActionBar } from "./PostCard";
 import { displayName, timeAgo, same } from "./utils";
+import { RichPostText } from "./RichPostText";
+import { AuthorBadges, ModBanner, SourceLabel, PollBlock, PromoLabel, PromoCTA } from "./PostParts";
+import { useAds, logAd } from "./postQueries";
+
+// a promoted post is shown after every AD_EVERY posts
+const AD_EVERY = 6;
 
 const PAGE = 8;                        // posts that load in each step
 const LOAD_DELAY = 350;                // ms the skeleton shows before more posts are added
@@ -132,10 +138,10 @@ function useRevealOnce(onShow) {
 
 const FeedSkeleton = () => <div className="h-72 w-full animate-pulse rounded-3xl bg-slate-400/20" />;
 
-function FeedCard({ post }) {
+function FeedCard({ post, promo = null }) {
   const { t } = useTheme();
   const { currentUser } = useAuth();
-  const { users, openPost, openPostMenu, now } = usePosts();
+  const { users, openPost, now, openPostMenu, openUserSheet } = usePosts();
   const uid = currentUser.id;
   // posts that already appeared before are shown immediately, with no animation
   const [wasSeen] = useState(() => getState(uid).revealed.has(String(post.id)));
@@ -143,6 +149,7 @@ function FeedCard({ post }) {
   const shown = wasSeen || reveal;
   const author = { ...(users[post.user_id] || {}), username: users[post.user_id]?.username || post.username };
   const textOnly = !post.files.length && !post.repost_of;
+  useEffect(() => { if (promo) logAd(promo.promotion_id, "impression"); }, [promo]);
 
   return (
     <div
@@ -155,10 +162,14 @@ function FeedCard({ post }) {
 
 
       <div className="flex items-center gap-2 px-1 mb-2">
-        <Avatar user={author} size={30} />
+        <button onClick={(e) => { e.stopPropagation(); openUserSheet(post.user_id); }} className="shrink-0 rounded-full" title="View profile">
+          <Avatar user={author} size={30} />
+        </button>
         <div className="flex-1 min-w-0 leading-tight">
           <div className="flex items-center gap-1.5">
              <span className="text-xs font-semibold truncate">{displayName(author)}</span>
+             <AuthorBadges user={author} />
+             {promo && <PromoLabel />}
                 {author.username && displayName(author) !== author.username && (
             <p className={`text-xs truncate ${t.sub}`}>@{author.username}</p>
           )}
@@ -169,13 +180,9 @@ function FeedCard({ post }) {
        
         <div className="flex-1" />
         {/* 3 dots: view interactions, report post, report user, follow / unfollow */}
-        <button
-          onClick={(e) => { e.stopPropagation(); openPostMenu(post); }}
-          className="p-1 text-violet-500 cursor-pointer"
-        >
-          <MoreVertical size={18} />
-        </button>
+        <button onClick={(e) => { e.stopPropagation(); openPostMenu(post); }} className="p-1 text-violet-500"><MoreVertical size={18} /></button>
       </div>
+      <ModBanner post={post} />
       {post.repost_of && (
         <p className={`flex items-center gap-1.5 text-xs font-semibold mb-2 px-1 ${t.sub}`}>
           <Repeat size={12} /> {displayName(author)} reposted
@@ -190,14 +197,19 @@ function FeedCard({ post }) {
       {textOnly ? (
         post.content && (
           <div className="rounded-2xl p-5 mb-2">
-            <RichText text={post.content} className="text-xl font-bold leading-snug line-clamp-6" />
+            <RichPostText text={post.content} className="text-xl font-bold leading-snug line-clamp-6" />
           </div>
         )
       ) : (
-        <RichText text={post.content} className="text-[17px] font-semibold leading-snug line-clamp-3 px-1 mb-3" />
+        <RichPostText text={post.content} className="text-[17px] font-semibold leading-snug line-clamp-3 px-1 mb-3" />
       )}
 
-      <div className="px-1"><ActionBar post={post} /></div>
+      <div className="px-1">
+        <SourceLabel post={post} author={author} />
+        <PollBlock post={post} />
+        <PromoCTA promo={promo} post={post} />
+        <ActionBar post={post} />
+      </div>
     </div>
   );
 }
@@ -205,7 +217,9 @@ function FeedCard({ post }) {
 export default function Feed({ error }) {
   const { t } = useTheme();
   const { currentUser } = useAuth();
-  const { posts, refresh } = usePosts(); // `refresh` is optional: used only if PostsContext provides it
+  // feedPosts = only the posts the server has sent to the feed so far (paginated)
+  const { feedPosts: posts, posts: livePosts, refresh, loadMoreFeed, feedHasMore } = usePosts();
+  const ads = useAds();
   const uid = currentUser.id;
   const st = getState(uid);
 
@@ -280,7 +294,7 @@ export default function Feed({ error }) {
   const pending = posts.filter((p) => !same(p.user_id, uid) && timeOf(p) > limit).length;
 
   const visible = useMemo(() => live.slice(0, count), [live, count]);
-  const hasMore = count < live.length;
+  const hasMore = count < live.length || feedHasMore;
 
   // remember every post that is on screen so it is still there when the user comes back
   useEffect(() => {
@@ -369,14 +383,16 @@ export default function Feed({ error }) {
       if (!e.isIntersecting) return;
       io.disconnect();
       setLoadingMore(true);
-      moreTimer.current = setTimeout(() => {
+      moreTimer.current = setTimeout(async () => {
+        // everything we have is already on screen: ask the server for the next page first
+        if (count >= live.length && feedHasMore) await loadMoreFeed();
         setCount((c) => c + PAGE);
         setLoadingMore(false);
       }, LOAD_DELAY);
     }, { rootMargin: "0px 0px 700px 0px" });
     io.observe(el);
     return () => io.disconnect();
-  }, [hasMore, loadingMore, count]);
+  }, [hasMore, loadingMore, count, live.length, feedHasMore, loadMoreFeed]);
 
   return (
     <div
@@ -414,9 +430,15 @@ export default function Feed({ error }) {
         <p className={`text-center text-sm py-12 ${t.sub}`}>No posts yet. Be the first to post something!</p>
       )}
 
-      {visible.map((p) => (
-        <FeedCard key={`${round}-${p.id}`} post={p} />
-      ))}
+      {visible.map((p, i) => {
+        const ad = (i + 1) % AD_EVERY === 0 && ads.length ? ads[Math.floor(i / AD_EVERY) % ads.length] : null;
+        return (
+          <Fragment key={`${round}-${p.id}`}>
+            <FeedCard post={p} />
+            {ad && <FeedCard post={livePosts.find((x) => same(x.id, ad.post.id)) || ad.post} promo={ad} />}
+          </Fragment>
+        );
+      })}
 
       {hasMore && (
         <>

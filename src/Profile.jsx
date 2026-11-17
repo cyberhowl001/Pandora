@@ -3,18 +3,18 @@ import { Camera, Check } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "./AuthContext";
 import { useFollows } from "./FollowContext";
-import { usePosts } from "./PostsContext";
 import { useNotifications } from "./NotificationsContext";
 import { useTheme } from "./theme";
 import { Avatar, PageShell } from "./ui";
 import { PostList } from "./PostCard";
 import { StatsPanel } from "./UserStats";
-import { compressImage, mediaSrc, same } from "./utils";
+import { useUserPosts } from "./useUserPosts";
+import { uploadAvatar } from "./storage";
+import { compressImage, mediaSrc } from "./utils";
 
 export default function Profile({ onBack, nav }) {
   const { t } = useTheme();
   const { currentUser, updateCurrentUser } = useAuth();
-  const { posts } = usePosts();
   const { notify } = useNotifications();
   const { mutuals, followers, following } = useFollows();
   const [tab, setTab] = useState("details"); // details | posts
@@ -25,7 +25,7 @@ export default function Profile({ onBack, nav }) {
   const [msg, setMsg] = useState("");
   const fileRef = useRef(null);
 
-  const mine = posts.filter((p) => same(p.user_id, currentUser.id));
+  const { list: mine, hasMore, loadMore, loading: loadingPosts } = useUserPosts(currentUser.id);
   const changed =
     surname.trim() !== (currentUser.surname || "") ||
     otherName.trim() !== (currentUser.other_name || "") ||
@@ -46,11 +46,16 @@ export default function Profile({ onBack, nav }) {
     if (!surname.trim() && !otherName.trim()) return setMsg("Please enter a name.");
     setSaving(true);
     setMsg("");
-    const patch = { surname: surname.trim(), other_name: otherName.trim(), avatar };
+    // a new photo is uploaded to Supabase Storage; the profile only keeps its URL
+    let avatarUrl = avatar;
+    try { avatarUrl = await uploadAvatar(avatar, currentUser.id); }
+    catch (e) { console.error(e); setSaving(false); return setMsg("Could not upload the photo."); }
+    const patch = { surname: surname.trim(), other_name: otherName.trim(), avatar: avatarUrl };
     const { error } = await supabase.from("users").update(patch).eq("id", currentUser.id);
     setSaving(false);
     if (error) { console.error(error); return setMsg("Could not save. Check your connection."); }
     updateCurrentUser(patch);
+    setAvatar(patch.avatar);
     notify(currentUser.id, "profile");
     setMsg("Saved ✓");
   };
@@ -82,7 +87,7 @@ export default function Profile({ onBack, nav }) {
       <StatsPanel userId={currentUser.id} />
 
       <div className={`flex p-1 rounded-2xl ${t.chip.split(" ")[0]}`}>
-        {[["details", "User details"], ["posts", `PanTweets (${mine.length})`]].map(([k, label]) => (
+        {[["details", "User details"], ["posts", `PanTweets (${mine.length}${hasMore ? "+" : ""})`]].map(([k, label]) => (
           <button key={k} onClick={() => setTab(k)} className={`flex-1 py-2 rounded-xl text-sm font-bold ${tab === k ? t.accent : t.sub}`}>{label}</button>
         ))}
       </div>
@@ -107,7 +112,12 @@ export default function Profile({ onBack, nav }) {
           {msg && <p className={`text-xs text-center ${msg.includes("✓") ? "text-green-500" : "text-red-400"}`}>{msg}</p>}
         </div>
       ) : (
-        <PostList posts={mine} empty="You have no active PanTweets" />
+        <>
+          <PostList posts={mine} empty={loadingPosts ? "Loading…" : "You have no active PanTweets"} />
+          {hasMore && (
+            <button onClick={loadMore} className={`w-full py-2.5 rounded-xl text-sm font-bold ${t.chip}`}>Load more</button>
+          )}
+        </>
       )}
     </PageShell>
   );

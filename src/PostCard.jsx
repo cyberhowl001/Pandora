@@ -6,7 +6,9 @@ import {
 import { useAuth } from "./AuthContext";
 import { usePosts } from "./PostsContext";
 import { useTheme } from "./theme";
-import { Avatar, RichText, useReveal, revealClass } from "./ui";
+import { Avatar, useReveal, revealClass } from "./ui";
+import { RichPostText } from "./RichPostText";
+import { AuthorBadges, ModBanner, SourceLabel, PollBlock } from "./PostParts";
 import { displayName, fmt, timeLeft, mediaSrc, isVideo, same } from "./utils";
 
 // ---------- Left / right slider for posts with more than one photo ----------
@@ -83,7 +85,7 @@ export function RepostRef({ refPost }) {
         <span className="font-bold text-xs">{displayName(author)}</span>
         <span className={`text-xs ${t.sub}`}>@{author.username}</span>
       </div>
-      <RichText text={refPost.content} className="text-sm" />
+      <RichPostText text={refPost.content} className="text-sm" />
       {refPost.image && <img src={mediaSrc(refPost.image)} alt="" className="mt-2 w-full max-h-48 object-cover rounded-lg" />}
       {refPost.has_video && <p className={`mt-1 text-xs ${t.sub}`}>🎬 Video in the original post</p>}
     </div>
@@ -115,7 +117,7 @@ export function PostBody({ post, inSheet = false, onDelete }) {
         </button>
         <div className="flex-1 min-w-0">
           <p className="truncate">
-            <span className="font-bold text-sm">{displayName(author)}</span>{" "}
+            <span className="font-bold text-sm">{displayName(author)}</span><AuthorBadges user={author} />{" "}
             <span className={`text-xs ${t.sub}`}>@{author.username}</span>
           </p>
           <div className={`flex items-center gap-1 text-xs ${t.sub}`}>
@@ -130,12 +132,15 @@ export function PostBody({ post, inSheet = false, onDelete }) {
         {/* 3 dots: view interactions, report post, report user, follow / unfollow */}
         <button
           onClick={(e) => { e.stopPropagation(); openPostMenu(post); }}
-          className="p-1 text-violet-500 cursor-pointer"
+          className="p-1 text-violet-500"
         >
           <MoreVertical size={18} />
         </button>
       </div>
-      <RichText text={post.content} className="text-[15px] leading-relaxed mb-3" />
+      <ModBanner post={post} />
+      <RichPostText text={post.content} className="text-[15px] leading-relaxed mb-3" />
+      <SourceLabel post={post} author={author} />
+      <PollBlock post={post} />
       {post.repost_of && <RepostRef refPost={post.repost_of} />}
       <MediaSlider files={post.files} contain={inSheet} heightClass={inSheet ? "h-72" : "h-64"} />
     </>

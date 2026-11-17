@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Image, Video, Type, X } from "lucide-react";
+import { Image, Video, Type, X, BarChart3, Newspaper, Plus } from "lucide-react";
 import { usePosts } from "./PostsContext";
 import { useTheme } from "./theme";
 import { Sheet } from "./ui";
@@ -8,6 +8,12 @@ import { compressImage, fileToMedia, mediaSrc } from "./utils";
 const MAX_PHOTOS = 10;
 const MAX_IMAGE_MB = 10; // photos are compressed before saving
 const MAX_VIDEO_MB = 25;
+const MAX_OPTIONS = 4;
+
+const TYPES = [
+  ["text", Type, "Text"], ["image", Image, "Photos"], ["video", Video, "Video"],
+  ["poll", BarChart3, "Poll"], ["news", Newspaper, "News"],
+];
 
 export default function CreatePost({ onClose }) {
   const { t } = useTheme();
@@ -15,9 +21,12 @@ export default function CreatePost({ onClose }) {
   const [type, setType] = useState("text");
   const [content, setContent] = useState("");
   const [files, setFiles] = useState([]);
+  const [options, setOptions] = useState(["", ""]);
+  const [sourceUrl, setSourceUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const inputRef = useRef(null);
+  const media = type === "image" || type === "video";
 
   const pick = async (e) => {
     const picked = [...e.target.files];
@@ -46,33 +55,54 @@ export default function CreatePost({ onClose }) {
     }
   };
 
+  const cleanOptions = options.map((o) => o.trim()).filter(Boolean);
+  const validUrl = /^https?:\/\/\S+\.\S+/i.test(sourceUrl.trim());
+
+  const canPost =
+    type === "text" ? content.trim()
+    : media ? files.length
+    : type === "poll" ? content.trim() && cleanOptions.length >= 2
+    : content.trim() && validUrl;
+
   const submit = async () => {
     setBusy(true);
     setError("");
-    const err = await createPost({ type, content, files });
+    const payload =
+      type === "poll" ? { type: "text", kind: "poll", content, poll: { options: cleanOptions.slice(0, MAX_OPTIONS) } }
+      : type === "news" ? { type: "text", kind: "news", content, source_url: sourceUrl.trim() }
+      : { type, content, files };
+    const err = await createPost(payload);
     setBusy(false);
-    if (err) return setError("Could not post. The file may be too large, or you're offline.");
+    if (err) {
+      return setError(String(err?.message || "").includes("rate_limited")
+        ? "You are posting too fast. Please wait a while and try again."
+        : "Could not post. The file may be too large, or you're offline.");
+    }
     onClose();
   };
 
-  const canPost = type === "text" ? content.trim() : files.length;
+  const placeholder =
+    type === "text" ? "What's on your mind? Use #hashtags"
+    : type === "poll" ? "Ask a question…"
+    : type === "news" ? "Headline or short summary of the news…"
+    : "Add a caption (optional)…";
 
   return (
     <Sheet title="New PanTweet" onClose={onClose} full={false}>
       <div className="space-y-3">
-        <div className="flex gap-2">
-          {[["text", <Type size={14} />, "Text"], ["image", <Image size={14} />, "Photos"], ["video", <Video size={14} />, "Video"]].map(([k, icon, label]) => (
+        <div className="flex gap-1.5">
+          {TYPES.map(([k, Icon, label]) => (
             <button
               key={k}
-              onClick={() => { setType(k); setFiles([]); }}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold ${type === k ? t.accent : `${t.chip} ${t.sub}`}`}
+              onClick={() => { setType(k); setFiles([]); setError(""); }}
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-[11px] font-bold ${type === k ? t.accent : `${t.chip} ${t.sub}`}`}
             >
-              {icon} {label}
+              <Icon size={15} /> {label}
             </button>
           ))}
         </div>
 
-        {type !== "text" && (
+        {media && (
           <>
             <div className="flex gap-2 flex-wrap">
               {files.map((f, i) => (
@@ -96,7 +126,7 @@ export default function CreatePost({ onClose }) {
               )}
             </div>
             <p className={`text-xs ${t.sub}`}>
-              {type === "image" ? `Up to ${MAX_PHOTOS} photos. Viewers slide left / right to see them.` : `One video, max ${MAX_VIDEO_MB}MB.`}
+              {type === "image" ? `Up to ${MAX_PHOTOS} photos. Viewers slide left / right to see them.` : `One video, max ${MAX_VIDEO_MB}MB. It also appears in Shorts.`}
             </p>
             <input
               ref={inputRef} type="file" className="hidden"
@@ -110,10 +140,46 @@ export default function CreatePost({ onClose }) {
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder={type === "text" ? "What's on your mind? Use #hashtags" : "Add a caption (optional)…"}
+          placeholder={placeholder}
           rows={type === "text" ? 4 : 2}
           className={`w-full border rounded-xl px-3 py-2 text-sm outline-none resize-none ${t.input}`}
         />
+
+        {type === "poll" && (
+          <div className="space-y-2">
+            {options.map((o, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input
+                  value={o} maxLength={60}
+                  onChange={(e) => setOptions((p) => p.map((x, j) => (j === i ? e.target.value : x)))}
+                  placeholder={`Option ${i + 1}`}
+                  className={`flex-1 border rounded-xl px-3 py-2 text-sm outline-none ${t.input}`}
+                />
+                {options.length > 2 && (
+                  <button onClick={() => setOptions((p) => p.filter((_, j) => j !== i))} className={`p-1 ${t.sub}`}><X size={16} /></button>
+                )}
+              </div>
+            ))}
+            {options.length < MAX_OPTIONS && (
+              <button onClick={() => setOptions((p) => [...p, ""])} className={`flex items-center gap-1 text-xs font-bold ${t.accentText}`}>
+                <Plus size={14} /> Add option
+              </button>
+            )}
+            <p className={`text-xs ${t.sub}`}>Voting stays open while the post is live (48h).</p>
+          </div>
+        )}
+
+        {type === "news" && (
+          <div className="space-y-1.5">
+            <input
+              value={sourceUrl} onChange={(e) => setSourceUrl(e.target.value)} type="url"
+              placeholder="Link to the original source (https://…)"
+              className={`w-full border rounded-xl px-3 py-2 text-sm outline-none ${t.input}`}
+            />
+            <p className={`text-xs ${t.sub}`}>News posts must link their source. Only verified publishers get a verified label; everyone else is shown as unverified.</p>
+          </div>
+        )}
+
         {error && <p className="text-red-400 text-xs">{error}</p>}
         <button onClick={submit} disabled={busy || !canPost} className={`w-full py-3 rounded-xl font-bold text-sm disabled:opacity-50 ${t.accent}`}>
           {busy ? "Please wait…" : "Post (lasts 48h)"}

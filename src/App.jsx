@@ -12,6 +12,8 @@ import Mutuals from "./Mutuals";
 import Bookmarks from "./Bookmarks";
 import Notifications from "./Notifications";
 import UserView from "./UserView";
+import MediaPage from "./MediaPage";
+import InstallBanner from "./InstallBanner";
 import { PostOverlays } from "./PostOverlays";
 
 function AppInner() {
@@ -54,6 +56,7 @@ function AppInner() {
           {top.page === "bookmarks" && <Bookmarks onBack={back} />}
           {top.page === "notifications" && <Notifications onBack={back} nav={nav} />}
           {top.page === "user" && <UserView key={top.userId} userId={top.userId} onBack={back} />}
+          {top.page === "media" && <MediaPage onBack={back} />}
           <PostOverlays nav={nav} />
         </PostsProvider>
       </FollowProvider>
@@ -66,6 +69,7 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <AppInner />
+        <InstallBanner />
       </AuthProvider>
     </ThemeProvider>
   );

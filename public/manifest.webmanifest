@@ -1,0 +1,16 @@
+{
+  "name": "Pandora",
+  "short_name": "Pandora",
+  "description": "Share moments that matter, before they fade.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d0d0d",
+  "theme_color": "#0d0d0d",
+  "icons": [
+    { "src": "/logo192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/logo512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

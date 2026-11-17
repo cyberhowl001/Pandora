@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LogOut, Trash2, Flag, Mail, ChevronRight, Search } from "lucide-react";
+import { LogOut, Trash2, Flag, Mail, ChevronRight, Search, Briefcase, Wallet, Scale } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "./AuthContext";
 import { usePosts } from "./PostsContext";
@@ -7,6 +7,9 @@ import { useTheme } from "./theme";
 import { Sheet, Avatar } from "./ui";
 import { displayName, same } from "./utils";
 import { PANDORA_HELP_EMAIL } from "./pandoraInfo";
+import { BusinessSheet, CreatorSheet, AppealsSheet } from "./GrowthSheets";
+
+const REASONS = [["spam", "Spam"], ["misinformation", "Misinformation"], ["harassment", "Harassment"], ["sexual", "Sexual content"], ["violence", "Violence"], ["illegal", "Illegal"], ["other", "Other"]];
 
 // Report a user, or a post by that user.
 // Pass `preset` (a user) to skip the picker, and `post` to report a specific post.
@@ -17,6 +20,7 @@ export function ReportSheet({ onClose, preset = null, post = null }) {
   const [target, setTarget] = useState(preset);
   const [q, setQ] = useState("");
   const [reason, setReason] = useState("");
+  const [code, setCode] = useState("other");
   const [sent, setSent] = useState(false);
 
   const list = Object.values(users).filter((u) => !same(u.id, currentUser.id) &&
@@ -29,6 +33,8 @@ export function ReportSheet({ onClose, preset = null, post = null }) {
       reporter_id: currentUser.id,
       reported_username: target.username,
       reason: post ? `[Post ${post.id}] ${reason}` : reason,
+      reason_code: code,
+      post_id: post ? String(post.id) : null,
     }]);
     await supabase.from("admin_notifications").insert([{
       type: "report", message: `@${currentUser.username} reported ${what}: ${reason}`,
@@ -59,6 +65,11 @@ export function ReportSheet({ onClose, preset = null, post = null }) {
         </>
       ) : (
         <>
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {REASONS.map(([k, l]) => (
+              <button key={k} onClick={() => setCode(k)} className={`px-3 py-1.5 rounded-full text-xs font-bold ${code === k ? "bg-red-500 text-white" : t.chip}`}>{l}</button>
+            ))}
+          </div>
           <textarea
             value={reason} onChange={(e) => setReason(e.target.value)} rows={4}
             placeholder={post ? "Why are you reporting this post?" : "Why are you reporting this account?"}
@@ -93,11 +104,17 @@ export function SettingsSheet({ onClose }) {
   const row = `w-full flex items-center gap-3 p-4 rounded-2xl border text-left font-bold text-sm ${t.card}`;
 
   if (view === "report") return <ReportSheet onClose={onClose} />;
+  if (view === "business") return <BusinessSheet onClose={onClose} />;
+  if (view === "creator") return <CreatorSheet onClose={onClose} />;
+  if (view === "appeals") return <AppealsSheet onClose={onClose} />;
 
   return (
     <Sheet title={view === "delete" ? "Delete account" : view === "help" ? "Send help message" : "Settings"} onClose={onClose}>
       {view === "menu" && (
         <div className="space-y-2">
+          <button className={row} onClick={() => setView("business")}><Briefcase size={18} className={t.accentText} /><span className="flex-1">Business &amp; promotions</span><ChevronRight size={16} /></button>
+          <button className={row} onClick={() => setView("creator")}><Wallet size={18} className={t.accentText} /><span className="flex-1">Creator earnings</span><ChevronRight size={16} /></button>
+          <button className={row} onClick={() => setView("appeals")}><Scale size={18} className={t.accentText} /><span className="flex-1">Moderation &amp; appeals</span><ChevronRight size={16} /></button>
           <button className={row} onClick={() => setView("report")}><Flag size={18} className={t.accentText} /><span className="flex-1">Report a user</span><ChevronRight size={16} /></button>
           <button className={row} onClick={() => setView("help")}><Mail size={18} className={t.accentText} /><span className="flex-1">Send help message</span><ChevronRight size={16} /></button>
           <button className={`${row} text-red-400`} onClick={async () => { onClose(); await logout(); }}><LogOut size={18} /><span className="flex-1">Log out</span></button>

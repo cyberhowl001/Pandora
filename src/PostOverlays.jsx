@@ -10,6 +10,8 @@ import { displayName, fmt, timeAgo, same } from "./utils";
 import UserSheet from "./UserSheet";
 import { PostMenu, InteractionsSheet } from "./PostMenu";
 import { ReportSheet } from "./Settings";
+import TopicPage from "./TopicPage";
+import { PromoteSheet, TipSheet } from "./GrowthSheets";
 
 // Post opens in a sheet covering 90% of the screen, rest of the screen stays blurred
 function PostSheet() {
@@ -165,15 +167,19 @@ function RepostSheet() {
 }
 
 export function PostOverlays({ nav }) {
-  const { openedPost, repostTarget, menuPost, interactionsPost, reportReq, setReportReq, profileUserId } = usePosts();
+  const { openedPost, repostTarget, menuPost, interactionsPost, reportReq, setReportReq, profileUserId,
+          topicTag, promoTarget, setPromoTarget, tipTarget, setTipTarget } = usePosts();
   return (
     <>
+      {topicTag && <TopicPage />}
       {openedPost && <PostSheet />}
       {repostTarget && <RepostSheet />}
       {profileUserId != null && <UserSheet nav={nav} />}
       {interactionsPost && <InteractionsSheet />}
       {menuPost && <PostMenu />}
-      {/* own stacking context so the report sheet always sits on top */}
+      {/* own stacking contexts so these sheets always sit on top */}
+      {promoTarget && <div className="relative z-[95]"><PromoteSheet post={promoTarget} onClose={() => setPromoTarget(null)} /></div>}
+      {tipTarget && <div className="relative z-[95]"><TipSheet target={tipTarget} onClose={() => setTipTarget(null)} /></div>}
       {reportReq && (
         <div className="relative z-[95]">
           <ReportSheet preset={reportReq.user} post={reportReq.post} onClose={() => setReportReq(null)} />

@@ -1,17 +1,21 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
+import { USER_COLS } from "./authShared";
+import { removeUserMedia } from "./storage";
+import AdminExtras, { EXTRA_TABS } from "./AdminExtras";
 import {
   Shield, Users, Bell, Trash2, CheckCircle, XCircle,
   LogOut, Flag, Eye, EyeOff, MessageSquare, RefreshCw, ArrowLeft
 } from "lucide-react";
 
-const ADMIN_USERNAME = "Alkali Jesse";
-const ADMIN_PASSWORD = "Jessewizz123";
+// No passwords in this file any more: the admin is a real Supabase Auth account
+// listed in the `admins` table, and every admin action is checked by the database.
 
 export default function AdminDashboard({ onBack }) {
   const [authed, setAuthed] = useState(false);
   const [loginForm, setLoginForm] = useState({ name: "", password: "" });
   const [loginError, setLoginError] = useState("");
+  const [loginBusy, setLoginBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const [tab, setTab] = useState("pending");
@@ -24,6 +28,11 @@ export default function AdminDashboard({ onBack }) {
   const [editUser, setEditUser] = useState(null);
   const [editForm, setEditForm] = useState({});
 
+  // already signed in as admin (page reload)?
+  useEffect(() => {
+    supabase.rpc("is_admin").then(({ data }) => { if (data === true) setAuthed(true); });
+  }, []);
+
   useEffect(() => { if (authed) loadAll(); }, [authed]);
 
   const loadAll = async () => {
@@ -33,38 +42,56 @@ export default function AdminDashboard({ onBack }) {
       { data: all },
       { data: reps },
       { data: notifs },
+      { data: priv },
     ] = await Promise.all([
-      supabase.from("users").select("*").eq("status", "pending").order("created_at", { ascending: false }),
-      supabase.from("users").select("*").order("created_at", { ascending: false }),
+      supabase.from("users").select(USER_COLS).eq("status", "pending").order("created_at", { ascending: false }),
+      supabase.from("users").select(USER_COLS).order("created_at", { ascending: false }),
       supabase.from("reports").select("*").order("created_at", { ascending: false }),
       supabase.from("admin_notifications").select("*").order("created_at", { ascending: false }),
+      supabase.from("user_private").select("user_id, phone"), // phone numbers: admin only
     ]);
-    setPendingUsers(pending || []);
-    setAllUsers(all || []);
+    const phones = Object.fromEntries((priv || []).map((p) => [String(p.user_id), p.phone]));
+    const withPhone = (list) => (list || []).map((u) => ({ ...u, phone: phones[String(u.id)] || "" }));
+    setPendingUsers(withPhone(pending));
+    setAllUsers(withPhone(all));
     setReports(reps || []);
     setNotifications(notifs || []);
     setLoading(false);
   };
 
-  const handleAdminLogin = (e) => {
+  const handleAdminLogin = async (e) => {
     e.preventDefault();
-    if (loginForm.name === ADMIN_USERNAME && loginForm.password === ADMIN_PASSWORD) {
-      setAuthed(true); setLoginError("");
-    } else {
-      setLoginError("Invalid admin credentials.");
+    setLoginError("");
+    setLoginBusy(true);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: loginForm.name.trim(),
+      password: loginForm.password,
+    });
+    if (error) { setLoginBusy(false); return setLoginError("Invalid admin credentials."); }
+    const { data: ok } = await supabase.rpc("is_admin");
+    setLoginBusy(false);
+    if (ok !== true) {
+      await supabase.auth.signOut({ scope: "local" });
+      return setLoginError("This account is not an admin.");
     }
+    setAuthed(true);
+  };
+
+  const logoutAdmin = async () => {
+    await supabase.auth.signOut();
+    setAuthed(false);
   };
 
   // ── User actions ────────────────────────────────────────────────────────────
 
   const acceptUser = async (user) => {
-    await supabase.from("users").update({ status: "accepted" }).eq("id", user.id);
+    await supabase.rpc("admin_set_status", { p_user: String(user.id), p_status: "accepted" });
     loadAll();
   };
 
   const rejectUser = async (user) => {
     const msg = rejectMsg[user.id] || "";
-    await supabase.from("users").update({ status: "rejected" }).eq("id", user.id);
+    await supabase.rpc("admin_set_status", { p_user: String(user.id), p_status: "rejected" });
     if (msg) {
       await supabase.from("admin_notifications").insert([{
         type: "rejection_reason",
@@ -76,24 +103,24 @@ export default function AdminDashboard({ onBack }) {
     loadAll();
   };
 
-  const deleteUser = async (userId, username) => {
+  const deleteUser = async (userId) => {
     if (!window.confirm("Permanently delete this user and all their data?")) return;
-    await supabase.from("pantweets").delete().eq("user_id", userId);
-    await supabase.from("followers").delete().or(`follower_id.eq.${userId},following_id.eq.${userId}`);
-    await supabase.from("reports").delete().eq("reporter_id", userId);
-    if (username) await supabase.from("reports").delete().eq("reported_username", username);
-    await supabase.from("users").delete().eq("id", userId);
+    await removeUserMedia(userId); // their uploaded photos / videos
+    const { error } = await supabase.rpc("delete_account", { p_user: String(userId) });
+    if (error) alert(error.message);
     loadAll();
   };
 
   const saveUserEdit = async () => {
-    await supabase.from("users").update({
-      surname: editForm.surname,
-      other_name: editForm.other_name,
-      username: editForm.username,
-      phone: editForm.phone,
-      status: editForm.status,
-    }).eq("id", editUser.id);
+    const { error } = await supabase.rpc("admin_update_user", {
+      p_user: String(editUser.id),
+      p_surname: editForm.surname || "",
+      p_other_name: editForm.other_name || "",
+      p_username: editForm.username || "",
+      p_phone: editForm.phone || "",
+      p_status: editForm.status,
+    });
+    if (error) return alert(error.message);
     setEditUser(null);
     loadAll();
   };
@@ -124,8 +151,8 @@ export default function AdminDashboard({ onBack }) {
           <form onSubmit={handleAdminLogin} className="space-y-3">
             <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3">
               <input
-                type="text"
-                placeholder="Admin name"
+                type="email"
+                placeholder="Admin email"
                 value={loginForm.name}
                 onChange={(e) => setLoginForm((p) => ({ ...p, name: e.target.value }))}
                 className="w-full bg-transparent text-white text-sm outline-none placeholder-gray-600"
@@ -144,8 +171,8 @@ export default function AdminDashboard({ onBack }) {
               </button>
             </div>
             {loginError && <p className="text-red-400 text-sm">{loginError}</p>}
-            <button type="submit" className="w-full py-3 bg-amber-400 hover:bg-amber-500 text-black font-black rounded-xl transition-all">
-              Sign In as Admin
+            <button type="submit" disabled={loginBusy} className="w-full py-3 bg-amber-400 hover:bg-amber-500 text-black font-black rounded-xl transition-all disabled:opacity-60">
+              {loginBusy ? "Signing in…" : "Sign In as Admin"}
             </button>
             {onBack && (
               <button
@@ -169,7 +196,7 @@ export default function AdminDashboard({ onBack }) {
     { key: "all", label: "All Users", count: allUsers.length, icon: <Users size={14} /> },
     { key: "reports", label: "Reports", count: reports.length, icon: <Flag size={14} /> },
     { key: "notifications", label: "Inbox", count: unreadCount, icon: <MessageSquare size={14} /> },
-  ];
+  ].concat(EXTRA_TABS.map((e) => ({ key: e.key, label: e.label, count: 0, icon: <e.Icon size={14} /> })));
 
   return (
     <div className="min-h-screen w-full bg-[#0d0d0d] text-white">
@@ -186,7 +213,7 @@ export default function AdminDashboard({ onBack }) {
         <button onClick={loadAll} className="p-2 rounded-xl hover:bg-white/5 transition-all text-gray-400">
           <RefreshCw size={15} />
         </button>
-        <button onClick={() => setAuthed(false)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 text-gray-400 hover:bg-white/5 text-sm transition-all">
+        <button onClick={logoutAdmin} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 text-gray-400 hover:bg-white/5 text-sm transition-all">
           <LogOut size={14} /> Logout
         </button>
       </header>
@@ -258,7 +285,7 @@ export default function AdminDashboard({ onBack }) {
                       Edit
                     </button>
                     <button
-                      onClick={() => deleteUser(user.id, user.username)}
+                      onClick={() => deleteUser(user.id)}
                       className="px-2.5 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-xs font-bold transition-all flex items-center gap-1"
                     >
                       <Trash2 size={12} /> Delete
@@ -290,7 +317,7 @@ export default function AdminDashboard({ onBack }) {
                   </span>
                   {allUsers.some((u) => u.username === r.reported_username) ? (
                     <button
-                      onClick={() => deleteUser(allUsers.find((u) => u.username === r.reported_username).id, r.reported_username)}
+                      onClick={() => deleteUser(allUsers.find((u) => u.username === r.reported_username).id)}
                       className="px-2.5 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-xs font-bold transition-all flex items-center gap-1"
                     >
                       <Trash2 size={12} /> Delete account
@@ -303,6 +330,8 @@ export default function AdminDashboard({ onBack }) {
             ))}
           </div>
         )}
+
+        {EXTRA_TABS.some((e) => e.key === tab) && <AdminExtras tab={tab} />}
 
         {/* NOTIFICATIONS */}
         {tab === "notifications" && !loading && (
@@ -346,6 +375,7 @@ export default function AdminDashboard({ onBack }) {
                 <option value="pending">Pending</option>
                 <option value="accepted">Accepted</option>
                 <option value="rejected">Rejected</option>
+                <option value="suspended">Suspended</option>
               </select>
             </div>
             <div className="flex gap-2 mt-4">

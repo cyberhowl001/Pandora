@@ -1,23 +1,19 @@
 import { useState } from "react";
 import { useAuth } from "./AuthContext";
 import { supabase } from "../supabaseClient";
+import { normalizePhone } from "./phone";
 import { Eye, EyeOff, Lock, Phone, AtSign, ChevronRight, CheckCircle, Shield } from "lucide-react";
 
-// "+234 801 234 5678", "0801-234-5678" and "2348012345678" all count as the same number
-const normalizePhone = (p) => {
-  let d = p.trim().replace(/[^\d+]/g, "");
-  if (d.startsWith("+234")) d = "0" + d.slice(4);
-  else if (d.startsWith("234")) d = "0" + d.slice(3);
-  return d.replace(/\D/g, "");
-};
-
 export default function SignIn({ onGoToAdmin }) {
-  const { login } = useAuth();
+  const { login, register } = useAuth();
   const [mode, setMode] = useState("login"); // 'login' | 'register'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [suspended, setSuspended] = useState(false);
+  const [appealText, setAppealText] = useState("");
+  const [appealMsg, setAppealMsg] = useState("");
 
   // Login form
   const [loginData, setLoginData] = useState({ username: "", password: "" });
@@ -35,9 +31,11 @@ export default function SignIn({ onGoToAdmin }) {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const { error: err } = await login(loginData.username, loginData.password);
+    const res = await login(loginData.username, loginData.password);
     setLoading(false);
-    if (err) setError(err);
+    setSuspended(!!res.suspended);
+    setAppealMsg("");
+    if (res.error) setError(res.error);
     // On success AuthContext sets currentUser and App routes to PanTweet.
   };
 
@@ -52,75 +50,27 @@ export default function SignIn({ onGoToAdmin }) {
       setError("Username cannot contain spaces.");
       return;
     }
-    const phone = normalizePhone(regData.phone);
-    if (phone.length < 7) {
-      setError("Please enter a valid phone number.");
+    if (regData.username.length > 30) {
+      setError("Username can be at most 30 characters.");
       return;
     }
+    if (regData.password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+    const phoneRes = normalizePhone(regData.phone);
+    if (phoneRes.error) {
+      setError(phoneRes.error);
+      return;
+    }
+    const phone = phoneRes.value;
     setLoading(true);
 
-    // One account per phone number
-    const { data: phoneUsed } = await supabase
-      .from("users")
-      .select("id")
-      .in("phone", [phone, regData.phone.trim()])
-      .limit(1);
-    if (phoneUsed && phoneUsed.length > 0) {
-      setError("This number has already been used.");
-      setLoading(false);
-      return;
-    }
-
-    // Check username uniqueness
-    const { data: existing } = await supabase
-      .from("users")
-      .select("id")
-      .eq("username", regData.username)
-      .maybeSingle();
-
-    if (existing) {
-      setError("Username already taken. Choose another.");
-      setLoading(false);
-      return;
-    }
-
-    // Create the account: active immediately, no admin approval needed
-    const { error: insertErr } = await supabase.from("users").insert([{
-      surname: regData.surname,
-      other_name: regData.other_name,
-      username: regData.username,
-      password_hash: regData.password, // In production: hash via Edge Fn
-      phone,
-      status: "accepted",
-    }]);
-
-    if (insertErr) {
-      setError(insertErr.code === "23505" && /phone/i.test(insertErr.message || "") ? "This number has already been used." : "Registration failed. Please try again.");
-      setLoading(false);
-      return;
-    }
-
-    // Notify admin
-    const { data: newUser } = await supabase
-      .from("users")
-      .select("id")
-      .eq("username", regData.username)
-      .maybeSingle();
-
-    if (newUser) {
-      await supabase.from("admin_notifications").insert([{
-        type: "new_user",
-        ref_id: newUser.id,
-        message: `New account created: @${regData.username}`,
-      }]);
-    }
-
+    // AuthContext checks the username / phone, creates the account and signs the user in.
+    const { error: err } = await register({ ...regData, phone, phoneRaw: regData.phone.trim() });
     setLoading(false);
-    setSuccess(
-      "Account created! You can log in now."
-    );
-    setLoginData({ username: regData.username, password: "" });
-    setMode("login");
+    if (err) setError(err);
+    // On success AuthContext sets currentUser and App routes to PanTweet.
   };
 
   return (
@@ -191,6 +141,28 @@ export default function SignIn({ onGoToAdmin }) {
               {error}
             </div>
           )}
+          {suspended && (
+            <div className="mb-4 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-gray-300 space-y-2">
+              <p className="font-bold text-white">Think this is a mistake? Send an appeal.</p>
+              <textarea
+                value={appealText} onChange={(e) => setAppealText(e.target.value)} rows={3}
+                placeholder="Explain why your account should be restored…"
+                className="w-full bg-transparent border border-white/10 rounded-xl px-3 py-2 text-sm outline-none text-white placeholder-gray-600"
+              />
+              <button
+                type="button"
+                disabled={appealText.trim().length < 5}
+                onClick={async () => {
+                  const { error: e } = await supabase.rpc("public_appeal", { p_username: loginData.username.trim(), p_message: appealText.trim() });
+                  setAppealMsg(e ? e.message : "Appeal sent. We will review it.");
+                }}
+                className="w-full py-2 bg-amber-400 text-black font-bold rounded-xl disabled:opacity-50"
+              >
+                Send appeal
+              </button>
+              {appealMsg && <p className="text-xs text-amber-400">{appealMsg}</p>}
+            </div>
+          )}
           {success && (
             <div className="mb-4 px-4 py-3 bg-green-500/10 border border-green-500/30 rounded-xl text-green-400 text-sm flex items-start gap-2">
               <CheckCircle size={16} className="shrink-0 mt-0.5" />
@@ -238,7 +210,7 @@ export default function SignIn({ onGoToAdmin }) {
               />
               <Field
                 icon={<Phone size={15} />}
-                placeholder="Phone number *"
+                placeholder="Phone with country code, e.g. +1 555 010 9999 *"
                 value={regData.phone}
                 onChange={(v) => setRegData((p) => ({ ...p, phone: v }))}
                 type="tel"
@@ -257,7 +229,7 @@ export default function SignIn({ onGoToAdmin }) {
                 {loading ? "Creating account…" : "Create Account"}
               </button>
               <p className="text-xs text-gray-500 text-center">
-                Your account is ready as soon as you register. You can sign in right away.
+                Your account is ready as soon as you register. You will be signed in right away.
               </p>
             </form>
           )}
