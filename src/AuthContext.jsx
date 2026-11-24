@@ -131,7 +131,7 @@ export function AuthProvider({ children }) {
   };
 
   // Create an account. The profile row is created by the database in the same step.
-  const register = async ({ surname, other_name, username, password, phone, phoneRaw }) => {
+  const register = async ({ surname, other_name, username, password, phone, phoneRaw, display_name, guidelines_version }) => {
     const { data: uTaken } = await supabase.rpc("username_taken", { p_username: username });
     if (uTaken) return { error: "Username already taken. Choose another." };
     const { data: pTaken } = await supabase.rpc("phone_taken", { p_phones: [phone, phoneRaw || phone] });
@@ -140,12 +140,12 @@ export function AuthProvider({ children }) {
     const { data, error } = await supabase.auth.signUp({
       email: emailFor(username),
       password,
-      options: { data: { surname, other_name, username, phone } },
+      options: { data: { surname, other_name, username, phone, display_name: (display_name || "").trim(), accepted_guidelines: true, guidelines_version } },
     });
     if (error) {
       console.error("[register] sign-up failed:", error);
       if (/database error/i.test(error.message)) {
-        return { error: "Could not create your profile. Admin: run auth_fixes.sql (a users column is blocking sign-up)." };
+        return { error: "Could not create your profile. Admin: see auth_fix_signup.sql (the database rejected the new profile)." };
       }
       if (/registered|exists/i.test(error.message)) return { error: "Username already taken. Choose another." };
       if (/password/i.test(error.message)) return { error: "Password is too weak. Use at least 6 characters." };

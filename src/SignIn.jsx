@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAuth } from "./AuthContext";
 import { supabase } from "../supabaseClient";
 import { normalizePhone } from "./phone";
+import { GuidelinesSheet, GUIDELINES_VERSION } from "./Guidelines";
 import { Eye, EyeOff, Lock, Phone, AtSign, ChevronRight, CheckCircle, Shield } from "lucide-react";
 
 export default function SignIn({ onGoToAdmin }) {
@@ -11,6 +12,8 @@ export default function SignIn({ onGoToAdmin }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [agree, setAgree] = useState(false);
+  const [showGuidelines, setShowGuidelines] = useState(false);
   const [suspended, setSuspended] = useState(false);
   const [appealText, setAppealText] = useState("");
   const [appealMsg, setAppealMsg] = useState("");
@@ -25,6 +28,7 @@ export default function SignIn({ onGoToAdmin }) {
     username: "",
     password: "",
     phone: "",
+    display_name: "",
   });
 
   const handleLogin = async (e) => {
@@ -64,10 +68,18 @@ export default function SignIn({ onGoToAdmin }) {
       return;
     }
     const phone = phoneRes.value;
+    if (regData.display_name.trim() && regData.display_name.trim().length < 2) {
+      setError("Display name needs at least 2 characters.");
+      return;
+    }
+    if (!agree) {
+      setError("Please confirm that you are 18 or older and agree to the Community Guidelines.");
+      return;
+    }
     setLoading(true);
 
     // AuthContext checks the username / phone, creates the account and signs the user in.
-    const { error: err } = await register({ ...regData, phone, phoneRaw: regData.phone.trim() });
+    const { error: err } = await register({ ...regData, phone, phoneRaw: regData.phone.trim(), guidelines_version: GUIDELINES_VERSION });
     setLoading(false);
     if (err) setError(err);
     // On success AuthContext sets currentUser and App routes to PanTweet.
@@ -130,7 +142,7 @@ export default function SignIn({ onGoToAdmin }) {
               className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 text-gray-400 hover:text-amber-400 hover:bg-amber-400/10 border border-transparent hover:border-amber-400/20"
               title="Admin Portal"
             >
-              {/* <Shield size={14} /> */}
+              <Shield size={14} />
               <span className="hidden sm:inline">Admin</span>
             </button>
           </div>
@@ -209,6 +221,11 @@ export default function SignIn({ onGoToAdmin }) {
                 onChange={(v) => setRegData((p) => ({ ...p, username: v.replace(/\s/g, "") }))}
               />
               <Field
+                placeholder="Display name (optional, shown instead of your real name)"
+                value={regData.display_name}
+                onChange={(v) => setRegData((p) => ({ ...p, display_name: v.slice(0, 30) }))}
+              />
+              <Field
                 icon={<Phone size={15} />}
                 placeholder="Phone with country code, e.g. +1 555 010 9999 *"
                 value={regData.phone}
@@ -221,6 +238,13 @@ export default function SignIn({ onGoToAdmin }) {
                 show={showPassword}
                 toggle={() => setShowPassword((p) => !p)}
               />
+              <label className="flex items-start gap-2 text-xs text-gray-400">
+                <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5" />
+                <span>
+                  I am 18 or older and I agree to the{" "}
+                  <button type="button" onClick={() => setShowGuidelines(true)} className="text-amber-400 underline">Community Guidelines</button>.
+                </span>
+              </label>
               <button
                 type="submit"
                 disabled={loading}
@@ -238,8 +262,12 @@ export default function SignIn({ onGoToAdmin }) {
                Created by Cyberhowl (Explore $Update)
             {/* Created by Cyberhowl (Alkali Jesse Uchubiyojo) */}
           </p>
+          <p className="text-center mt-2">
+            <button type="button" onClick={() => setShowGuidelines(true)} className="text-xs text-gray-500 underline">Community Guidelines</button>
+          </p>
         </div>
       </div>
+      {showGuidelines && <GuidelinesSheet onClose={() => setShowGuidelines(false)} />}
     </div>
   );
 }
