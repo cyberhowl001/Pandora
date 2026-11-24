@@ -1,5 +1,5 @@
 import { supabase } from "../supabaseClient";
-import { mediaSrc } from "./utils";
+import { mediaUrl as mediaSrc } from "./media";
 
 const BUCKET = "media";
 

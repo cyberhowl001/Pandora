@@ -6,6 +6,7 @@ import { usePosts } from "./PostsContext";
 import { useTheme } from "./theme";
 import { Avatar } from "./ui";
 import { StatsView, useUserStats } from "./UserStats";
+import { BioText } from "./Bio";
 import { displayName, fmt, same } from "./utils";
 
 // Slides up from the bottom to 80% of the screen when a user's photo is tapped
@@ -64,6 +65,7 @@ export default function UserSheet({ nav }) {
                   @{user.username}
                   {user.is_online && <span className="text-green-500"> · ● Online</span>}
                 </p>
+                <BioText bio={user.bio} />
 
                 <div className="flex gap-10 mt-4 text-center">
                   <div><p className="font-black text-lg">{s ? fmt(s.followers) : "–"}</p><p className={`text-xs ${t.sub}`}>Followers</p></div>

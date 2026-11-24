@@ -4,6 +4,7 @@ import { useAuth } from "./AuthContext";
 import { useTheme } from "./theme";
 import { Sheet } from "./ui";
 import { fmt } from "./utils";
+import { clampWords, countWords, BIO_MAX_WORDS } from "./Bio";
 
 const TIP_CURRENCY = "USD"; // must be a currency your payment account can accept
 
@@ -112,8 +113,9 @@ export function BusinessSheet({ onClose }) {
             </div>
           )}
           <Field t={t} label="About your business or yourself">
-            <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} maxLength={300} className={`w-full border rounded-xl px-3 py-2 text-sm outline-none resize-none ${t.input}`} />
+            <textarea value={bio} onChange={(e) => setBio(clampWords(e.target.value))} rows={3} className={`w-full border rounded-xl px-3 py-2 text-sm outline-none resize-none ${t.input}`} />
           </Field>
+          <p className={`-mt-2 text-xs ${t.sub}`}>{countWords(bio)}/{BIO_MAX_WORDS} words</p>
           <Field t={t} label="Website (https://…)">
             <input value={website} onChange={(e) => setWebsite(e.target.value)} className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none ${t.input}`} />
           </Field>

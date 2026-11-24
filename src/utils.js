@@ -4,6 +4,7 @@ export const POST_LIFETIME_HOURS = 48;
 
 export const displayName = (u) => {
   if (!u) return "Unknown";
+  if (u.display_name && u.display_name.trim()) return u.display_name.trim(); // chosen public name
   const n = `${u.surname || ""} ${u.other_name || ""}`.trim();
   return n || u.username || "Unknown";
 };
@@ -30,7 +31,16 @@ export const timeAgo = (iso, now = Date.now()) => {
 };
 
 export const same = (a, b) => String(a) === String(b);
-export const mediaSrc = (m) => `data:${m.type};base64,${m.data}`;
+
+// Where a photo / video comes from:
+//  - new posts: a public URL in Supabase Storage  ({ url, path, type, name })
+//  - old posts: base64 stored in the post         ({ data, type, name })
+export const mediaSrc = (m) => {
+  if (!m) return "";
+  if (m.url) return m.url;
+  if (m.data) return `data:${m.type};base64,${m.data}`;
+  return "";
+};
 export const isVideo = (m) => m?.type?.startsWith("video/");
 
 export const readAsDataUrl = (file) =>
@@ -47,7 +57,7 @@ export const fileToMedia = async (file) => {
   return { data: url.split(",")[1], type: file.type, name: file.name };
 };
 
-// Shrinks photos before saving (keeps database rows small)
+// Shrinks photos before saving (keeps uploads small)
 export async function compressImage(file, maxDim = 1600, quality = 0.8) {
   if (file.type === "image/gif") return fileToMedia(file);
   const url = await readAsDataUrl(file);

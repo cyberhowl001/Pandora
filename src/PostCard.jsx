@@ -8,8 +8,53 @@ import { usePosts } from "./PostsContext";
 import { useTheme } from "./theme";
 import { Avatar, useReveal, revealClass } from "./ui";
 import { RichPostText } from "./RichPostText";
+import { useLowData } from "./lowData";
 import { AuthorBadges, ModBanner, SourceLabel, PollBlock } from "./PostParts";
-import { displayName, fmt, timeLeft, mediaSrc, isVideo, same } from "./utils";
+import { displayName, fmt, timeLeft, isVideo, same } from "./utils";
+import { mediaUrl as mediaSrc } from "./media";
+
+// one photo / video. With data saver on it loads only after a tap, and videos never preload.
+function MediaItem({ f, contain }) {
+  const { low } = useLowData();
+  const [load, setLoad] = useState(false);
+  const [broken, setBroken] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const video = isVideo(f);
+  if (low && !load) {
+    return (
+      <button
+        onClick={(e) => { e.stopPropagation(); setLoad(true); }}
+        className="grid h-full w-full place-items-center bg-black/10 text-center"
+      >
+        <span className="text-sm font-bold">{video ? "▶ Tap to load video" : "Tap to load photo"}</span>
+        <span className="text-xs opacity-60">Data saver is on</span>
+      </button>
+    );
+  }
+  // if the file cannot be loaded, say so (and log the address, so the cause can be found) instead of a broken icon
+  const base = mediaSrc(f);
+  const src = attempt && f.url ? `${base}?r=${attempt}` : base;
+  const onBad = (e) => {
+    console.error("[media] could not load:", (e.currentTarget.currentSrc || e.currentTarget.src || "(empty)").slice(0, 300), "file object:", f);
+    setBroken(true);
+  };
+  if (broken) {
+    return (
+      <button
+        onClick={(e) => { e.stopPropagation(); setBroken(false); setAttempt((n) => n + 1); }}
+        className="grid h-full w-full place-items-center bg-black/10 text-center"
+      >
+        <span className="text-sm font-bold">Could not load this {video ? "video" : "photo"}</span>
+        <span className="text-xs opacity-60">Tap to try again</span>
+      </button>
+    );
+  }
+  return video ? (
+    <video src={src} controls preload="metadata" onError={onBad} onClick={(e) => e.stopPropagation()} className="w-full h-full object-contain bg-black" />
+  ) : (
+    <img src={src} alt="" loading="lazy" decoding="async" onError={onBad} className={`w-full h-full ${contain ? "object-contain" : "object-cover"}`} />
+  );
+}
 
 // ---------- Left / right slider for posts with more than one photo ----------
 export function MediaSlider({ files, contain = false, heightClass = "h-64" }) {
@@ -39,11 +84,7 @@ export function MediaSlider({ files, contain = false, heightClass = "h-64" }) {
       >
         {files.map((f, i) => (
           <div key={i} className={`snap-start shrink-0 ${multi ? "w-[85%]" : "w-full"} ${heightClass} rounded-xl overflow-hidden bg-black/10`}>
-            {isVideo(f) ? (
-              <video src={mediaSrc(f)} controls onClick={(e) => e.stopPropagation()} className="w-full h-full object-contain bg-black" />
-            ) : (
-              <img src={mediaSrc(f)} alt="" className={`w-full h-full ${contain ? "object-contain" : "object-cover"}`} />
-            )}
+            <MediaItem f={f} contain={contain} />
           </div>
         ))}
       </div>

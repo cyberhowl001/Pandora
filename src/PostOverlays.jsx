@@ -52,7 +52,12 @@ function PostSheet() {
     setSending(true);
     const { data, error } = await addComment(post, draft);
     setSending(false);
-    if (error) return alert("Could not send your comment. Check your connection.");
+    if (error) {
+      console.error("[comment] failed:", error);
+      return alert(String(error.message || "").includes("rate_limited")
+        ? "You are commenting too fast. Please wait a little."
+        : `Could not send your comment. (${error.message || "unknown error"})`);
+    }
     setComments((prev) => (prev.some((c) => c.id === data.id) ? prev : [data, ...prev]));
     setDraft("");
   };

@@ -8,6 +8,7 @@ import { Avatar, PageShell } from "./ui";
 import { PostList } from "./PostCard";
 import { ReportSheet } from "./Settings";
 import { StatsPanel } from "./UserStats";
+import { BioText } from "./Bio";
 import { useUserPosts } from "./useUserPosts";
 import { displayName, same } from "./utils";
 
@@ -30,6 +31,7 @@ export default function UserView({ userId, onBack }) {
         <Avatar user={user} size={88} />
         <p className="font-black text-lg mt-2">{displayName(user)}</p>
         <p className={`text-sm ${t.sub}`}>@{user.username}{user.is_online && <span className="text-green-500"> · ● Online</span>}</p>
+        <BioText bio={user.bio} />
         {!own && (
           <div className="flex gap-2 mt-3">
             <button

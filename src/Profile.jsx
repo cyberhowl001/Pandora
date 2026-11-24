@@ -8,6 +8,7 @@ import { useTheme } from "./theme";
 import { Avatar, PageShell } from "./ui";
 import { PostList } from "./PostCard";
 import { StatsPanel } from "./UserStats";
+import { BioBox } from "./Bio";
 import { useUserPosts } from "./useUserPosts";
 import { uploadAvatar } from "./storage";
 import { compressImage, mediaSrc } from "./utils";
@@ -76,6 +77,7 @@ export default function Profile({ onBack, nav }) {
         </div>
         <p className="font-black text-lg mt-2">{`${surname} ${otherName}`.trim() || currentUser.username}</p>
         <p className={`text-sm ${t.sub}`}>@{currentUser.username}</p>
+        <BioBox />
         <div className="flex gap-8 mt-3">
           {stat("Mutuals", mutuals.length, "mutuals")}
           {stat("Followers", followers.length, "followers")}

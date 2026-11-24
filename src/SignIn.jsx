@@ -130,7 +130,7 @@ export default function SignIn({ onGoToAdmin }) {
               className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 text-gray-400 hover:text-amber-400 hover:bg-amber-400/10 border border-transparent hover:border-amber-400/20"
               title="Admin Portal"
             >
-              <Shield size={14} />
+              {/* <Shield size={14} /> */}
               <span className="hidden sm:inline">Admin</span>
             </button>
           </div>
