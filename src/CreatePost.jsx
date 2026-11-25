@@ -5,10 +5,12 @@ import { useTheme } from "./theme";
 import { Sheet } from "./ui";
 import { compressImage, fileToMedia, mediaSrc } from "./utils";
 import { addWatermark } from "./media";
+import { compressVideo } from "./videoCompress";
 
 const MAX_PHOTOS = 10;
 const MAX_IMAGE_MB = 10; // photos are compressed before saving
-const MAX_VIDEO_MB = 25;
+const MAX_VIDEO_MB = 10;   // a video bigger than this is compressed automatically, to under this size
+const MAX_VIDEO_INPUT_MB = 300; // the biggest file we will even try to compress
 const MAX_OPTIONS = 4;
 
 const TYPES = [
@@ -16,15 +18,16 @@ const TYPES = [
   ["poll", BarChart3, "Poll"], ["news", Newspaper, "News"],
 ];
 
-export default function CreatePost({ onClose }) {
+export default function CreatePost({ onClose, initialType = "text" }) {
   const { t } = useTheme();
   const { createPost } = usePosts();
-  const [type, setType] = useState("text");
+  const [type, setType] = useState(initialType);
   const [content, setContent] = useState("");
   const [files, setFiles] = useState([]);
   const [options, setOptions] = useState(["", ""]);
   const [sourceUrl, setSourceUrl] = useState("");
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(null); // 0..1 while a video is being compressed
   const [error, setError] = useState("");
   const inputRef = useRef(null);
   const media = type === "image" || type === "video";
@@ -46,8 +49,20 @@ export default function CreatePost({ onClose }) {
       } else {
         const f = picked[0];
         if (!f.type.startsWith("video/")) return alert("Please choose a video file.");
-        if (f.size > MAX_VIDEO_MB * 1024 * 1024) return alert(`Video must be under ${MAX_VIDEO_MB}MB.`);
-        setFiles([await fileToMedia(f)]);
+        if (f.size > MAX_VIDEO_INPUT_MB * 1024 * 1024) return alert(`Video must be under ${MAX_VIDEO_INPUT_MB}MB.`);
+        let file = f;
+        if (f.size > MAX_VIDEO_MB * 1024 * 1024) {
+          // too big: shrink it (lower quality) until it fits, instead of refusing it
+          try {
+            setProgress(0);
+            file = await compressVideo(f, { maxBytes: MAX_VIDEO_MB * 1024 * 1024, onProgress: setProgress });
+          } catch (e) {
+            return alert(e.message || "Could not compress that video.");
+          } finally {
+            setProgress(null);
+          }
+        }
+        setFiles([await fileToMedia(file)]);
       }
     } catch {
       alert("Could not read that file.");
@@ -122,12 +137,13 @@ export default function CreatePost({ onClose }) {
                   className={`w-20 h-20 rounded-xl border-2 border-dashed flex flex-col items-center justify-center text-xs ${t.line} ${t.sub}`}
                 >
                   {type === "image" ? <Image size={20} /> : <Video size={20} />}
-                  {busy ? "…" : "Add"}
+                  {progress != null ? `${Math.round(progress * 100)}%` : busy ? "…" : "Add"}
                 </button>
               )}
             </div>
+            {progress != null && <p className="text-xs font-bold text-amber-500">Compressing the video… keep this screen open.</p>}
             <p className={`text-xs ${t.sub}`}>
-              {type === "image" ? `Up to ${MAX_PHOTOS} photos. Viewers slide left / right to see them.` : `One video, max ${MAX_VIDEO_MB}MB. It also appears in Shorts.`}
+              {type === "image" ? `Up to ${MAX_PHOTOS} photos. Viewers slide left / right to see them.` : `One video. Over ${MAX_VIDEO_MB}MB is compressed automatically (lower quality). It also appears in PanVibes.`}
             </p>
             <input
               ref={inputRef} type="file" className="hidden"

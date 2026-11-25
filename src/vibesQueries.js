@@ -38,3 +38,11 @@ export const vibesQueries = {
     return (await videos(before).in("user_id", ids)).data || [];
   },
 };
+
+// People who have a live video right now (the "Starred" row), newest poster first
+export async function starredUserIds() {
+  const { data } = await supabase.from("pantweets").select("user_id")
+    .eq("type", "video").gt("expires_at", nowIso())
+    .order("created_at", { ascending: false }).limit(80);
+  return [...new Set((data || []).map((r) => String(r.user_id)))].slice(0, 20);
+}

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { Flag, Megaphone, Scale, Bot, Wallet, BadgeCheck, TrendingUp } from "lucide-react";
+import { Flag, Megaphone, Scale, Bot, Wallet, BadgeCheck, Star } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { USER_COLS } from "./authShared";
 import { removeMedia, removeUserMedia } from "./storage";
 import { money } from "./GrowthSheets";
-import EngagementTool from "./AdminEngagement";
+import AdminFeature from "./AdminFeature";
 
 export const EXTRA_TABS = [
   { key: "postreports", label: "Post reports", Icon: Flag },
@@ -13,7 +13,7 @@ export const EXTRA_TABS = [
   { key: "bots", label: "Bots", Icon: Bot },
   { key: "payouts", label: "Payouts", Icon: Wallet },
   { key: "badges", label: "Badges", Icon: BadgeCheck },
-  { key: "engagement", label: "Engagement", Icon: TrendingUp },
+  { key: "feature", label: "Feature", Icon: Star },
 ];
 
 const card = "bg-[#1a1a1a] border border-white/5 rounded-2xl p-4";
@@ -369,7 +369,7 @@ export default function AdminExtras({ tab }) {
       {tab === "bots" && <Bots />}
       {tab === "payouts" && <Payouts />}
       {tab === "badges" && <Badges />}
-      {tab === "engagement" && <EngagementTool />}
+      {tab === "feature" && <AdminFeature />}
     </div>
   );
 }

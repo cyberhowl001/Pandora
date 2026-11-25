@@ -9,6 +9,7 @@ import { timeAgo, same } from "./utils";
 const META = {
   like:         [Heart,         (n) => `${n.actor_name} liked your post`],
   comment:      [MessageCircle, (n) => `${n.actor_name} commented on your post`],
+  reply:        [MessageCircle, (n) => `${n.actor_name} replied to your comment`],
   share:        [Repeat,        (n) => `${n.actor_name} shared your post`],
   save:         [Bookmark,      (n) => `${n.actor_name} saved your post`],
   follow:       [UserPlus,      (n) => `${n.actor_name} started following you`],

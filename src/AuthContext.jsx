@@ -131,7 +131,7 @@ export function AuthProvider({ children }) {
   };
 
   // Create an account. The profile row is created by the database in the same step.
-  const register = async ({ surname, other_name, username, password, phone, phoneRaw, display_name, guidelines_version }) => {
+  const register = async ({ surname, other_name, username, password, phone, phoneRaw, display_name }) => {
     const { data: uTaken } = await supabase.rpc("username_taken", { p_username: username });
     if (uTaken) return { error: "Username already taken. Choose another." };
     const { data: pTaken } = await supabase.rpc("phone_taken", { p_phones: [phone, phoneRaw || phone] });
@@ -140,7 +140,7 @@ export function AuthProvider({ children }) {
     const { data, error } = await supabase.auth.signUp({
       email: emailFor(username),
       password,
-      options: { data: { surname, other_name, username, phone, display_name: (display_name || "").trim(), accepted_guidelines: true, guidelines_version } },
+      options: { data: { surname, other_name, username, phone, display_name: (display_name || "").trim(), accepted_guidelines: true } },
     });
     if (error) {
       console.error("[register] sign-up failed:", error);

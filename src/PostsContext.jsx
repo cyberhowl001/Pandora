@@ -17,23 +17,16 @@ const IDS_CHUNK = 50;   // ids per "in" query
 const snip = (p) => (p?.content || "").slice(0, 60) || null;
 const byNewest = (a, b) => new Date(b.created_at) - new Date(a.created_at);
 
-// Admin boosts (see engagement.sql) are stored as plain numbers on the post. They are shown as extra
-// entries in likes / views, so every counter in the app includes them. These entries start with "boost:"
-// and are never written back to the database (see realOnly / withBoost below).
-const pad = (kind, n) => Array.from({ length: Math.max(0, Number(n) || 0) }, (_, i) => `boost:${kind}:${i}`);
-const realOnly = (arr) => arr.filter((i) => !String(i).startsWith("boost:"));
-
 // Old posts used file_data; new posts use files[] (many photos). Support both.
 export const mapRow = (row) => ({
   ...row,
   files: Array.isArray(row.files) && row.files.length
     ? row.files
     : row.file_data ? [{ data: row.file_data, type: row.file_type, name: row.file_name }] : [],
-  likes: [...(row.likes || []), ...pad("l", row.boost_likes)],
-  views: [...(row.views || []), ...pad("v", row.boost_views)],
+  likes: row.likes || [],
+  views: row.views || [],
   comment_count: row.comment_count || 0,
-  repost_count: (row.repost_count || 0) + (row.boost_reposts || 0),
-  save_boost: row.boost_saves || 0,
+  repost_count: row.repost_count || 0,
   repost_of: row.repost_of || null,
 });
 
@@ -261,11 +254,9 @@ export function PostsProvider({ children }) {
 
   // ---------- post actions ----------
   const toggleLike = async (post) => {
-    const real = realOnly(post.likes);
-    const liked = real.some((i) => same(i, uid));
-    const likes = liked ? real.filter((i) => !same(i, uid)) : [...real, uid];       // what the database stores
-    const shown = [...likes, ...pad("l", post.boost_likes)];                         // what the screen shows
-    setAllPosts((prev) => prev.map((p) => (same(p.id, post.id) ? { ...p, likes: shown } : p)));
+    const liked = post.likes.some((i) => same(i, uid));
+    const likes = liked ? post.likes.filter((i) => !same(i, uid)) : [...post.likes, uid];
+    setAllPosts((prev) => prev.map((p) => (same(p.id, post.id) ? { ...p, likes } : p)));
     const { error: err } = await supabase.from("pantweets").update({ likes }).eq("id", post.id);
     if (err) setAllPosts((prev) => prev.map((p) => (same(p.id, post.id) ? { ...p, likes: post.likes } : p)));
     else if (!liked) notify(post.user_id, "like", { postId: post.id, preview: snip(post) });
@@ -276,9 +267,8 @@ export function PostsProvider({ children }) {
     if (!uid || same(post.user_id, uid)) return;
     const live = allPosts.find((p) => same(p.id, post.id));
     if (!live || live.views.some((v) => same(v, uid))) return;
-    const views = [...realOnly(live.views), uid];                                   // what the database stores
-    const shown = [...views, ...pad("v", live.boost_views)];                         // what the screen shows
-    setAllPosts((prev) => prev.map((p) => (same(p.id, post.id) ? { ...p, views: shown } : p)));
+    const views = [...live.views, uid];
+    setAllPosts((prev) => prev.map((p) => (same(p.id, post.id) ? { ...p, views } : p)));
     const { error: err } = await supabase.from("pantweets").update({ views }).eq("id", post.id);
     if (err) console.error("View failed:", err);
   };
@@ -332,11 +322,16 @@ export function PostsProvider({ children }) {
   const repostCountOf = (id) => posts.find((p) => same(p.id, id))?.repost_count || 0;
   const interactionsOf = (p) => p.views.length + p.likes.length + (p.comment_count || 0) + repostCountOf(p.id);
 
-  const addComment = async (post, content) => {
-    const res = await supabase.from("pantweet_comments").insert([{
-      post_id: String(post.id), user_id: String(uid), username: currentUser.username, content: content.trim(),
-    }]).select().single();
-    if (!res.error) notify(post.user_id, "comment", { postId: post.id, preview: content.trim().slice(0, 60) });
+  // `parent` (optional) = the comment this one replies to
+  const addComment = async (post, content, parent = null) => {
+    const row = { post_id: String(post.id), user_id: String(uid), username: currentUser.username, content: content.trim() };
+    if (parent) row.parent_id = String(parent.id);
+    const res = await supabase.from("pantweet_comments").insert([row]).select().single();
+    if (!res.error) {
+      const preview = content.trim().slice(0, 60);
+      if (parent) notify(parent.user_id, "reply", { postId: post.id, preview });          // the person you replied to
+      if (!parent || !same(parent.user_id, post.user_id)) notify(post.user_id, "comment", { postId: post.id, preview }); // the post owner
+    }
     return res;
   };
 

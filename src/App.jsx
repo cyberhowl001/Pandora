@@ -16,7 +16,6 @@ import MediaPage from "./MediaPage";
 import PanVibes from "./PanVibes";
 import InstallBanner from "./InstallBanner";
 import UpdateBanner from "./UpdateBanner";
-import { GuidelinesGate } from "./Guidelines";
 import { isStandalone } from "./installPrompt";
 import { PostOverlays } from "./PostOverlays";
 
@@ -71,7 +70,6 @@ function AppInner() {
           {top.page === "media" && <MediaPage onBack={back} />}
           {top.page === "vibes" && <PanVibes onBack={back} nav={nav} />}
           <PostOverlays nav={nav} />
-          <GuidelinesGate />
         </PostsProvider>
       </FollowProvider>
     </NotificationsProvider>

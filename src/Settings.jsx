@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LogOut, Trash2, Flag, Mail, ChevronRight, Search, Briefcase, Wallet, Scale, Ban, Wifi, BookOpen } from "lucide-react";
+import { LogOut, Trash2, Flag, Mail, ChevronRight, Search, Briefcase, Wallet, Scale, Ban, Wifi } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "./AuthContext";
 import { usePosts } from "./PostsContext";
@@ -9,7 +9,6 @@ import { displayName, same } from "./utils";
 import { PANDORA_HELP_EMAIL } from "./pandoraInfo";
 import { BusinessSheet, CreatorSheet, AppealsSheet } from "./GrowthSheets";
 import { BlockedSheet } from "./Safety";
-import { GuidelinesSheet } from "./Guidelines";
 import { useLowData } from "./lowData";
 
 const REASONS = [["hate", "Hate speech or discrimination"], ["harassment", "Harassment or bullying"], ["child_safety", "Child safety"], ["violence", "Violence or threats"], ["sexual", "Sexual content"], ["scam", "Scam or fraud"], ["misinformation", "Misinformation"], ["spam", "Spam"], ["illegal", "Illegal activity"], ["other", "Other"]];
@@ -112,7 +111,6 @@ export function SettingsSheet({ onClose }) {
   if (view === "creator") return <CreatorSheet onClose={onClose} />;
   if (view === "appeals") return <AppealsSheet onClose={onClose} />;
   if (view === "blocked") return <BlockedSheet onClose={onClose} />;
-  if (view === "guidelines") return <GuidelinesSheet onClose={onClose} />;
 
   return (
     <Sheet title={view === "delete" ? "Delete account" : view === "help" ? "Send help message" : "Settings"} onClose={onClose}>
@@ -131,7 +129,6 @@ export function SettingsSheet({ onClose }) {
             </span>
           </div>
           <button className={row} onClick={() => setView("blocked")}><Ban size={18} className={t.accentText} /><span className="flex-1">Blocked &amp; muted</span><ChevronRight size={16} /></button>
-          <button className={row} onClick={() => setView("guidelines")}><BookOpen size={18} className={t.accentText} /><span className="flex-1">Community Guidelines</span><ChevronRight size={16} /></button>
           <button className={row} onClick={() => setView("business")}><Briefcase size={18} className={t.accentText} /><span className="flex-1">Business &amp; promotions</span><ChevronRight size={16} /></button>
           <button className={row} onClick={() => setView("creator")}><Wallet size={18} className={t.accentText} /><span className="flex-1">Creator earnings</span><ChevronRight size={16} /></button>
           <button className={row} onClick={() => setView("appeals")}><Scale size={18} className={t.accentText} /><span className="flex-1">Moderation &amp; appeals</span><ChevronRight size={16} /></button>
