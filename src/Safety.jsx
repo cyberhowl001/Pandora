@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { usePosts } from "./PostsContext";
 import { useTheme } from "./theme";
 import { Sheet, Avatar } from "./ui";
-import { useLowData } from "./lowData";
 import { displayName } from "./utils";
 
 // Settings > Blocked & muted accounts
@@ -31,36 +30,6 @@ export function BlockedSheet({ onClose }) {
           </div>
         ))}
       </div>
-    </Sheet>
-  );
-}
-
-const OPTIONS = [
-  ["auto", "Automatic", "On when your phone's Data Saver is on or the connection is slow."],
-  ["on", "Always on", "Always save data."],
-  ["off", "Off", "Always load everything."],
-];
-
-// Settings > Data saver
-export function DataSaverSheet({ onClose }) {
-  const { t } = useTheme();
-  const { mode, setMode, low, autoDetected } = useLowData();
-  return (
-    <Sheet title="Data saver" onClose={onClose} full={false}>
-      <p className={`mb-3 text-xs ${t.sub}`}>
-        When on, photos and videos load only when you tap them, videos never play by themselves, and the Media page does not preload videos.
-      </p>
-      <div className="space-y-2">
-        {OPTIONS.map(([k, label, text]) => (
-          <button key={k} onClick={() => setMode(k)} className={`w-full rounded-2xl border p-3 text-left ${mode === k ? t.accent : t.card}`}>
-            <p className="text-sm font-bold">{label}</p>
-            <p className="text-xs opacity-80">{text}</p>
-          </button>
-        ))}
-      </div>
-      <p className={`mt-3 text-center text-xs ${t.sub}`}>
-        Data saver is currently <b>{low ? "ON" : "OFF"}</b>{autoDetected ? " (detected automatically)" : ""}.
-      </p>
     </Sheet>
   );
 }

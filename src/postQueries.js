@@ -100,3 +100,23 @@ export const logAd = (promotionId, event) => {
   }
   supabase.rpc("ad_event", { p_promotion: String(promotionId), p_event: event }).then(() => {}, () => {});
 };
+
+// Posts the admin team featured. Real posts with their real numbers; the feed just shows them to more people.
+export function useFeatured() {
+  const { ingest, posts } = usePosts();
+  const [ids, setIds] = useState([]);
+  useEffect(() => {
+    let alive = true;
+    supabase.from("pantweets").select("*")
+      .gt("featured_until", nowIso()).gt("expires_at", nowIso())
+      .order("featured_until", { ascending: false }).limit(5)
+      .then(({ data }) => {
+        if (!alive || !data) return;
+        ingest(data);
+        setIds(data.map((r) => String(r.id)));
+      });
+    return () => { alive = false; };
+  }, [ingest]);
+  const byId = new Map(posts.map((p) => [String(p.id), p]));
+  return ids.map((i) => byId.get(i)).filter(Boolean);
+}

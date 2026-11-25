@@ -1,28 +1,23 @@
 import { useEffect, useState } from "react";
 
-// Data saver: "auto" (follows the phone's data-saver / slow network), "on", or "off".
-const KEY = "pandora_low_data";
+// Data saver: a switch in Settings. It is OFF by default and only ever changes when the user flips it.
+// ON  = photos and videos load only after a tap, and videos do not play by themselves.
+// OFF = photos appear automatically and videos play by themselves while they are on screen.
+const KEY = "pandora_data_saver"; // "1" = on
 const listeners = new Set();
 const emit = () => listeners.forEach((fn) => fn());
 
-const readMode = () => { try { return localStorage.getItem(KEY) || "auto"; } catch { return "auto"; } };
-let mode = readMode();
+const read = () => { try { return localStorage.getItem(KEY) === "1"; } catch { return false; } };
+let on = read();
 
-const connection = () => navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-const slowNetwork = () => {
-  const c = connection();
-  return !!c && (c.saveData === true || ["slow-2g", "2g"].includes(c.effectiveType));
-};
-
-export const isLowData = () => mode === "on" || (mode === "auto" && slowNetwork());
-
-export const setLowDataMode = (m) => {
-  mode = m;
-  try { localStorage.setItem(KEY, m); } catch { /* ignore */ }
+export const setDataSaver = (value) => {
+  on = !!value;
+  try { localStorage.setItem(KEY, on ? "1" : "0"); } catch { /* ignore */ }
   emit();
 };
 
-connection()?.addEventListener?.("change", emit); // the network changed: re-check
+// keep other open tabs in step
+window.addEventListener("storage", (e) => { if (e.key === KEY) { on = read(); emit(); } });
 
 export function useLowData() {
   const [, force] = useState(0);
@@ -31,5 +26,5 @@ export function useLowData() {
     listeners.add(fn);
     return () => listeners.delete(fn);
   }, []);
-  return { low: isLowData(), mode, setMode: setLowDataMode, autoDetected: mode === "auto" && slowNetwork() };
+  return { on, setOn: setDataSaver };
 }

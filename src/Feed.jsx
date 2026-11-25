@@ -7,11 +7,13 @@ import { Avatar } from "./ui";
 import { MediaSlider, RepostRef, ActionBar } from "./PostCard";
 import { displayName, timeAgo, same } from "./utils";
 import { RichPostText } from "./RichPostText";
-import { AuthorBadges, ModBanner, SourceLabel, PollBlock, PromoLabel, PromoCTA } from "./PostParts";
-import { useAds, logAd } from "./postQueries";
+import { AuthorBadges, ModBanner, SourceLabel, PollBlock, PromoLabel, PromoCTA, FeaturedLabel } from "./PostParts";
+import { useAds, useFeatured, logAd } from "./postQueries";
 
 // a promoted post is shown after every AD_EVERY posts
 const AD_EVERY = 6;
+// featured posts appear after the 2nd post, then after every FEATURE_EVERY posts
+const FEATURE_EVERY = 5;
 
 const PAGE = 8;                        // posts that load in each step
 const LOAD_DELAY = 350;                // ms the skeleton shows before more posts are added
@@ -138,7 +140,7 @@ function useRevealOnce(onShow) {
 
 const FeedSkeleton = () => <div className="h-72 w-full animate-pulse rounded-3xl bg-slate-400/20" />;
 
-function FeedCard({ post, promo = null }) {
+function FeedCard({ post, promo = null, featured = false }) {
   const { t } = useTheme();
   const { currentUser } = useAuth();
   const { users, openPost, now, openPostMenu, openUserSheet } = usePosts();
@@ -170,6 +172,7 @@ function FeedCard({ post, promo = null }) {
              <span className="text-xs font-semibold truncate">{displayName(author)}</span>
              <AuthorBadges user={author} />
              {promo && <PromoLabel />}
+             {featured && <FeaturedLabel />}
                 {author.username && displayName(author) !== author.username && (
             <p className={`text-xs truncate ${t.sub}`}>@{author.username}</p>
           )}
@@ -220,6 +223,7 @@ export default function Feed({ error }) {
   // feedPosts = only the posts the server has sent to the feed so far (paginated)
   const { feedPosts: posts, posts: livePosts, refresh, loadMoreFeed, feedHasMore } = usePosts();
   const ads = useAds();
+  const featured = useFeatured();
   const uid = currentUser.id;
   const st = getState(uid);
 
@@ -430,15 +434,29 @@ export default function Feed({ error }) {
         <p className={`text-center text-sm py-12 ${t.sub}`}>No posts yet. Be the first to post something!</p>
       )}
 
-      {visible.map((p, i) => {
-        const ad = (i + 1) % AD_EVERY === 0 && ads.length ? ads[Math.floor(i / AD_EVERY) % ads.length] : null;
+      {(() => {
+        // a featured post shows once, in its featured slot, not again in the normal list
+        const featuredIds = new Set(featured.map((f) => String(f.id)));
+        const rest = visible.filter((p) => !featuredIds.has(String(p.id)));
+        const slot = (i) => (i >= 1 && (i - 1) % FEATURE_EVERY === 0 ? featured[(i - 1) / FEATURE_EVERY] : null);
         return (
-          <Fragment key={`${round}-${p.id}`}>
-            <FeedCard post={p} />
-            {ad && <FeedCard post={livePosts.find((x) => same(x.id, ad.post.id)) || ad.post} promo={ad} />}
-          </Fragment>
+          <>
+            {rest.map((p, i) => {
+              const ad = (i + 1) % AD_EVERY === 0 && ads.length ? ads[Math.floor(i / AD_EVERY) % ads.length] : null;
+              const feat = slot(i);
+              return (
+                <Fragment key={`${round}-${p.id}`}>
+                  <FeedCard post={p} />
+                  {feat && <FeedCard post={feat} featured />}
+                  {ad && <FeedCard post={livePosts.find((x) => same(x.id, ad.post.id)) || ad.post} promo={ad} />}
+                </Fragment>
+              );
+            })}
+            {/* very short feed: still show the featured posts */}
+            {rest.length < 2 && featured.map((f) => <FeedCard key={`f-${f.id}`} post={f} featured />)}
+          </>
         );
-      })}
+      })()}
 
       {hasMore && (
         <>

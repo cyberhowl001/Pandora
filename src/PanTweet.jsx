@@ -44,7 +44,7 @@ export default function PanTweet({ nav }) {
   // Desktop right-hand rail: [icon, label, action, active]. No action = display only.
   const groups = [
     [[Home, "Home", () => setTab("home"), tab === "home"], [Search, "Search", onSearch, sheet === "search"], [Plus, "New post", () => setSheet("create")]],
-    [[Box, "Box"], [Bell, "Notifications", () => nav("notifications")], [MessageCircle, "Chat"]],
+    [[Box, "Box", () => nav("vibes")], [Bell, "Notifications", () => nav("notifications")], [MessageCircle, "Chat"]],
     [[User, "Profile", () => nav("profile")], [Users, "Mutuals", () => nav("mutuals", { tab: "mutuals" })], [Bookmark, "Saved Bookmarks", () => nav("bookmarks")]],
     [[Globe, "Language"], [Users, "Communities"], [Briefcase, "Business"]],
     [[Palette, "Theme", () => setSheet("theme")], [Settings, "Settings", () => setSheet("settings")], [HelpCircle, "Rules & version", () => setSheet("rules")], [Moon, "Dark mode", toggleDark, darkOn]],
@@ -111,8 +111,8 @@ export default function PanTweet({ nav }) {
           <nav className={`md:hidden absolute bottom-0 w-full z-20 h-14 backdrop-blur-xl flex items-center justify-around ${t.glass}`}>
             <button onClick={() => setTab("home")} className={navIcon(tab === "home")}><Home size={24} /></button>
             <button onClick={() => setTab("search")} className={navIcon(tab === "search")}><Search size={24} /></button>
-            {/* middle button: created, no function yet */}
-            <button className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg ${PURPLE_BTN}`}><Box size={26} /></button>
+            {/* middle button: opens PanVibes (short videos) */}
+            <button onClick={() => nav("vibes")} className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg ${PURPLE_BTN}`}><Box size={26} /></button>
             <button onClick={() => nav("notifications")} className={`relative ${navIcon(false)}`}>
               <Bell size={24} />
               <Badge n={count} />

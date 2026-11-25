@@ -4,6 +4,7 @@ import { usePosts } from "./PostsContext";
 import { useTheme } from "./theme";
 import { Sheet } from "./ui";
 import { compressImage, fileToMedia, mediaSrc } from "./utils";
+import { addWatermark } from "./media";
 
 const MAX_PHOTOS = 10;
 const MAX_IMAGE_MB = 10; // photos are compressed before saving
@@ -39,7 +40,7 @@ export default function CreatePost({ onClose }) {
         for (const f of picked.slice(0, MAX_PHOTOS - files.length)) {
           if (!f.type.startsWith("image/")) { alert("Please choose image files only."); continue; }
           if (f.size > MAX_IMAGE_MB * 1024 * 1024) { alert(`${f.name} is over ${MAX_IMAGE_MB}MB.`); continue; }
-          out.push(await compressImage(f));
+          out.push(await addWatermark(await compressImage(f))); // "Pandora" is burned into new photos
         }
         setFiles((p) => [...p, ...out]);
       } else {

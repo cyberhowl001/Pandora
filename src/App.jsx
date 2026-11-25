@@ -13,7 +13,11 @@ import Bookmarks from "./Bookmarks";
 import Notifications from "./Notifications";
 import UserView from "./UserView";
 import MediaPage from "./MediaPage";
+import PanVibes from "./PanVibes";
 import InstallBanner from "./InstallBanner";
+import UpdateBanner from "./UpdateBanner";
+import { GuidelinesGate } from "./Guidelines";
+import { isStandalone } from "./installPrompt";
 import { PostOverlays } from "./PostOverlays";
 
 function AppInner() {
@@ -25,11 +29,19 @@ function AppInner() {
 
   useEffect(() => { setStack([{ page: "home" }]); }, [currentUser?.id]);
 
+  // installed app: always show the logo for a moment while it opens (the browser shows it while loading)
+  const [splash, setSplash] = useState(() => isStandalone());
+  useEffect(() => {
+    if (!splash) return;
+    const id = setTimeout(() => setSplash(false), 900);
+    return () => clearTimeout(id);
+  }, [splash]);
+
   const nav = (page, params = {}) =>
     setStack((s) => (page === "home" ? [{ page: "home" }] : [...s, { page, ...params }]));
   const back = () => setStack((s) => (s.length > 1 ? s.slice(0, -1) : s));
 
-  if (loading) {
+  if (loading || splash) {
     return (
       <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
@@ -57,7 +69,9 @@ function AppInner() {
           {top.page === "notifications" && <Notifications onBack={back} nav={nav} />}
           {top.page === "user" && <UserView key={top.userId} userId={top.userId} onBack={back} />}
           {top.page === "media" && <MediaPage onBack={back} />}
+          {top.page === "vibes" && <PanVibes onBack={back} nav={nav} />}
           <PostOverlays nav={nav} />
+          <GuidelinesGate />
         </PostsProvider>
       </FollowProvider>
     </NotificationsProvider>
@@ -70,6 +84,7 @@ export default function App() {
       <AuthProvider>
         <AppInner />
         <InstallBanner />
+        <UpdateBanner />
       </AuthProvider>
     </ThemeProvider>
   );

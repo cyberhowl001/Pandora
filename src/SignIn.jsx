@@ -90,6 +90,7 @@ export default function SignIn({ onGoToAdmin }) {
       {/* Left Panel */}
       <div className="hidden lg:flex w-1/2 flex-col justify-center items-center bg-linear-to-br from-amber-500/10 via-[#0d0d0d] to-amber-900/10 border-r border-white/5 p-12">
         <img src="/panda.png" alt="Pandora" className="w-24 mb-6 drop-shadow-2xl" />
+          
         <h1 className="text-5xl font-black text-white tracking-tight mb-3">
           Pan<span className="text-amber-400">dora</span>
         </h1>
@@ -137,14 +138,7 @@ export default function SignIn({ onGoToAdmin }) {
             >
               Register
             </button>
-            <button
-              onClick={() => onGoToAdmin?.()}
-              className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 text-gray-400 hover:text-amber-400 hover:bg-amber-400/10 border border-transparent hover:border-amber-400/20"
-              title="Admin Portal"
-            >
-              <Shield size={14} />
-              <span className="hidden sm:inline">Admin</span>
-            </button>
+    
           </div>
 
           {/* Error / Success */}
@@ -266,6 +260,15 @@ export default function SignIn({ onGoToAdmin }) {
             <button type="button" onClick={() => setShowGuidelines(true)} className="text-xs text-gray-500 underline">Community Guidelines</button>
           </p>
         </div>
+        
+              <button
+              onClick={() => onGoToAdmin?.()}
+              className="flex items-center mt-6.5 justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 text-gray-400 hover:text-amber-400 hover:bg-amber-400/10 border border-transparent hover:border-amber-400/20"
+              title="Admin Portal"
+            >
+              {/* <Shield size={14} />
+              <span className="hidden sm:inline">Admin</span> */}
+            </button>
       </div>
       {showGuidelines && <GuidelinesSheet onClose={() => setShowGuidelines(false)} />}
     </div>

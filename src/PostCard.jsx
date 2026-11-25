@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Heart, MessageCircle, Repeat, Eye, Bookmark, MoreVertical, Clock, Trash2,
   ChevronLeft, ChevronRight, Activity,
@@ -9,28 +9,50 @@ import { useTheme } from "./theme";
 import { Avatar, useReveal, revealClass } from "./ui";
 import { RichPostText } from "./RichPostText";
 import { useLowData } from "./lowData";
-import { AuthorBadges, ModBanner, SourceLabel, PollBlock } from "./PostParts";
+import { AuthorBadges, ModBanner, SourceLabel, PollBlock, Watermark } from "./PostParts";
 import { displayName, fmt, timeLeft, isVideo, same } from "./utils";
 import { mediaUrl as mediaSrc } from "./media";
 
-// one photo / video. With data saver on it loads only after a tap, and videos never preload.
+// One photo / video.
+//  - The frame follows the picture's own shape: full width, nothing cropped, no empty bars.
+//    (Very tall or very wide pictures get a blurred copy of themselves behind them instead of empty space.)
+//  - Data saver OFF: photos appear at once and videos play by themselves while on screen.
+//  - Data saver ON : photos and videos load only after a tap.
 function MediaItem({ f, contain }) {
-  const { low } = useLowData();
+  const { on: saver } = useLowData();
   const [load, setLoad] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [broken, setBroken] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const vidRef = useRef(null);
   const video = isVideo(f);
-  if (low && !load) {
+  const hidden = saver && !load;
+  const maxH = contain ? "max-h-[75vh]" : "max-h-[70vh]";
+
+  // play the video that is on screen, pause it when it scrolls away
+  useEffect(() => {
+    const v = vidRef.current;
+    if (!video || !v || hidden || saver) return;
+    const io = new IntersectionObserver(
+      ([e]) => { if (e.intersectionRatio >= 0.6) v.play().catch(() => {}); else v.pause(); },
+      { threshold: [0, 0.6, 1] }
+    );
+    io.observe(v);
+    return () => io.disconnect();
+  }, [video, hidden, saver, broken, attempt]);
+
+  if (hidden) {
     return (
       <button
         onClick={(e) => { e.stopPropagation(); setLoad(true); }}
-        className="grid h-full w-full place-items-center bg-black/10 text-center"
+        className="grid aspect-[4/3] w-full place-items-center bg-black/10 text-center"
       >
         <span className="text-sm font-bold">{video ? "▶ Tap to load video" : "Tap to load photo"}</span>
         <span className="text-xs opacity-60">Data saver is on</span>
       </button>
     );
   }
+
   // if the file cannot be loaded, say so (and log the address, so the cause can be found) instead of a broken icon
   const base = mediaSrc(f);
   const src = attempt && f.url ? `${base}?r=${attempt}` : base;
@@ -42,22 +64,44 @@ function MediaItem({ f, contain }) {
     return (
       <button
         onClick={(e) => { e.stopPropagation(); setBroken(false); setAttempt((n) => n + 1); }}
-        className="grid h-full w-full place-items-center bg-black/10 text-center"
+        className="grid aspect-[4/3] w-full place-items-center bg-black/10 text-center"
       >
         <span className="text-sm font-bold">Could not load this {video ? "video" : "photo"}</span>
         <span className="text-xs opacity-60">Tap to try again</span>
       </button>
     );
   }
-  return video ? (
-    <video src={src} controls preload="metadata" onError={onBad} onClick={(e) => e.stopPropagation()} className="w-full h-full object-contain bg-black" />
-  ) : (
-    <img src={src} alt="" loading="lazy" decoding="async" onError={onBad} className={`w-full h-full ${contain ? "object-contain" : "object-cover"}`} />
+
+  return (
+    <div className="relative w-full overflow-hidden">
+      {!video && (
+        <div
+          aria-hidden
+          className="absolute inset-0 scale-125 bg-cover bg-center opacity-70 blur-2xl"
+          style={{ backgroundImage: `url("${src}")` }}
+        />
+      )}
+      {video ? (
+        <video
+          ref={vidRef} src={src} controls muted loop playsInline preload="metadata"
+          autoPlay={saver && load}
+          onError={onBad} onClick={(e) => e.stopPropagation()}
+          className={`relative z-[1] block h-auto min-h-[200px] w-full bg-black object-contain ${maxH}`}
+        />
+      ) : (
+        <img
+          src={src} alt="" loading="lazy" decoding="async"
+          onLoad={() => setLoaded(true)} onError={onBad}
+          className={`relative z-[1] mx-auto block h-auto w-full object-contain ${maxH} ${loaded ? "" : "min-h-[200px]"}`}
+        />
+      )}
+      <Watermark file={f} />
+    </div>
   );
 }
 
 // ---------- Left / right slider for posts with more than one photo ----------
-export function MediaSlider({ files, contain = false, heightClass = "h-64" }) {
+export function MediaSlider({ files, contain = false }) {
   const ref = useRef(null);
   const [idx, setIdx] = useState(0);
   if (!files?.length) return null;
@@ -79,11 +123,11 @@ export function MediaSlider({ files, contain = false, heightClass = "h-64" }) {
       <div
         ref={ref}
         onScroll={onScroll}
-        className="pandora-noscroll flex gap-2 overflow-x-auto snap-x snap-mandatory"
+        className="pandora-noscroll flex items-start gap-2 overflow-x-auto snap-x snap-mandatory"
         style={{ scrollbarWidth: "none" }}
       >
         {files.map((f, i) => (
-          <div key={i} className={`snap-start shrink-0 ${multi ? "w-[85%]" : "w-full"} ${heightClass} rounded-xl overflow-hidden bg-black/10`}>
+          <div key={i} className={`snap-start shrink-0 ${multi ? "w-[85%]" : "w-full"} rounded-xl overflow-hidden bg-black/10`}>
             <MediaItem f={f} contain={contain} />
           </div>
         ))}
@@ -127,7 +171,12 @@ export function RepostRef({ refPost }) {
         <span className={`text-xs ${t.sub}`}>@{author.username}</span>
       </div>
       <RichPostText text={refPost.content} className="text-sm" />
-      {refPost.image && <img src={mediaSrc(refPost.image)} alt="" className="mt-2 w-full max-h-48 object-cover rounded-lg" />}
+      {refPost.image && (
+        <div className="relative mt-2">
+          <img src={mediaSrc(refPost.image)} alt="" className="w-full max-h-48 object-cover rounded-lg" />
+          <Watermark file={refPost.image} />
+        </div>
+      )}
       {refPost.has_video && <p className={`mt-1 text-xs ${t.sub}`}>🎬 Video in the original post</p>}
     </div>
   );
@@ -212,7 +261,7 @@ export function ActionBar({ post }) {
       <span className={`${btn} text-violet-500`}><Eye size={18} /> {fmt(post.views.length)}</span>
       <div className="flex-1" />
       <button onClick={stop(() => toggleBookmark(post))} className={`${btn} text-violet-500`}>
-        <Bookmark size={18} fill={saved ? "currentColor" : "none"} />
+        <Bookmark size={18} fill={saved ? "currentColor" : "none"} />{post.save_boost > 0 && <span>{fmt(post.save_boost)}</span>}
       </button>
     </div>
   );

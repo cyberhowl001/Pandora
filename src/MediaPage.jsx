@@ -5,7 +5,7 @@ import { usePosts } from "./PostsContext";
 import { useTheme } from "./theme";
 import { Avatar } from "./ui";
 import { RichPostText } from "./RichPostText";
-import { AuthorBadges, ModBanner } from "./PostParts";
+import { AuthorBadges, ModBanner, Watermark } from "./PostParts";
 import { usePagedPosts, useNearEnd, queries } from "./postQueries";
 import { displayName, fmt, isVideo, same } from "./utils";
 import { mediaUrl as mediaSrc } from "./media";
@@ -22,7 +22,7 @@ function Slide({ post, muted, nearEnd, hasMore, loadMore }) {
   const file = post.files[0];
   const video = isVideo(file);
   const liked = post.likes.some((i) => same(i, currentUser.id));
-  const { low } = useLowData(); // data saver: no autoplay, no preloading
+  const { on: saver } = useLowData();
 
   useEffect(() => {
     const io = new IntersectionObserver(([e]) => setVisible(e.intersectionRatio >= 0.6), { threshold: [0, 0.6, 1] });
@@ -36,7 +36,7 @@ function Slide({ post, muted, nearEnd, hasMore, loadMore }) {
     if (visible) {
       recordView(post);
       if (nearEnd && hasMore) loadMore();
-      if (v) { v.muted = muted; if (!low) v.play().catch(() => {}); }
+      if (v) { v.muted = muted; if (!saver) v.play().catch(() => {}); }
     } else if (v) { v.pause(); v.currentTime = 0; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
@@ -47,13 +47,17 @@ function Slide({ post, muted, nearEnd, hasMore, loadMore }) {
     <div ref={boxRef} className="relative h-full w-full snap-start snap-always shrink-0 bg-black">
       {video ? (
         <video
-          ref={vidRef} src={mediaSrc(file)} loop playsInline muted preload={low ? "none" : "metadata"}
+          ref={vidRef} src={mediaSrc(file)} loop playsInline muted preload={saver ? "none" : "metadata"}
           onClick={(e) => { const v = e.currentTarget; if (v.paused) v.play(); else v.pause(); }}
           className="h-full w-full object-contain"
         />
       ) : (
-        <img src={mediaSrc(file)} alt="" className="h-full w-full object-contain" />
+        <>
+          <div aria-hidden className="absolute inset-0 scale-125 bg-cover bg-center opacity-60 blur-2xl" style={{ backgroundImage: `url("${mediaSrc(file)}")` }} />
+          <img src={mediaSrc(file)} alt="" className="relative h-full w-full object-contain" />
+        </>
       )}
+      <Watermark file={file} pos="top-center" />
       {post.files.length > 1 && (
         <span className="absolute top-14 left-3 rounded-full bg-black/60 px-2 py-0.5 text-xs font-bold text-white">1/{post.files.length}</span>
       )}
@@ -130,7 +134,7 @@ export default function MediaPage({ onBack }) {
 
 function Explore({ openAt, setOpenAt }) {
   const { t } = useTheme();
-  const { low } = useLowData();
+  const { on: saver } = useLowData();
   const { list, loading, hasMore, loadMore } = usePagedPosts(queries.media("all"), "all");
   const end = useRef(null);
   useNearEnd(end, loadMore, hasMore && !loading);
@@ -145,9 +149,11 @@ function Explore({ openAt, setOpenAt }) {
             const f = p.files[0];
             return (
               <button key={p.id} onClick={() => setOpenAt(i)} className="relative aspect-square overflow-hidden bg-black/20">
-                {isVideo(f)
-                  ? (low ? <div className="h-full w-full bg-black/60" /> : <video src={`${mediaSrc(f)}#t=0.1`} muted preload="metadata" className="h-full w-full object-cover" />)
-                  : <img src={mediaSrc(f)} alt="" loading="lazy" className="h-full w-full object-cover" />}
+                {saver
+                  ? <div className="h-full w-full bg-black/40" />
+                  : isVideo(f)
+                    ? <video src={`${mediaSrc(f)}#t=0.1`} muted preload="metadata" className="h-full w-full object-cover" />
+                    : <img src={mediaSrc(f)} alt="" loading="lazy" className="h-full w-full object-cover" />}
                 {isVideo(f) && <Play size={16} fill="currentColor" className="absolute top-1.5 right-1.5 text-white drop-shadow" />}
                 {p.files.length > 1 && <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1 text-[10px] font-bold text-white">{p.files.length}</span>}
               </button>

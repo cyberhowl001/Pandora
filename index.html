@@ -1,21 +1,25 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Pandora</title>
 
-    <link rel="manifest" href="/manifest.json" />
-<link rel="apple-touch-icon" href="/logo192.png" />
-
-
-
-        <link rel="manifest" href="/manifest.json">
-      <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-    <link rel="shortcut icon" href="/favicon.ico">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Pandora</title>
-  </head>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#000000" />
+  <link rel="shortcut icon" href="/favicon.ico" />
+  <link rel="apple-touch-icon" href="/logo192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Pandora" />
+</head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+  <style>@keyframes pandoraPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.55;transform:scale(.94)}}</style>
+  <div style="min-height:100vh;background:#0d0d0d;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px">
+    <img src="/panda.png" alt="" width="56" height="56" style="animation:pandoraPulse 1.2s ease-in-out infinite">
+    <p style="color:#6b7280;font:14px system-ui,sans-serif;margin:0">Loading…</p>
+  </div>
+</div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

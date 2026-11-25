@@ -25,7 +25,7 @@ export async function uploadMedia(f, userId, folder = "posts") {
   });
   if (error) throw error;
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return { url: data.publicUrl, path, type, name: f.name || null };
+  return { url: data.publicUrl, path, type, name: f.name || null, wm: !!f.wm };
 }
 
 // Profile photo: a data: URL goes to storage and the public URL is returned.

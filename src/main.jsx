@@ -1,4 +1,5 @@
 import "./installPrompt"; // must load first: it catches the browser's install event
+import { registerServiceWorker } from "./pwaUpdate";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
@@ -14,9 +15,5 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   </React.StrictMode>
 );
 
-// the service worker is what makes browsers treat the site as installable
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch((e) => console.error("[pwa] service worker failed:", e));
-  });
-}
+// the service worker makes the site installable and delivers updates (see pwaUpdate.js)
+registerServiceWorker();

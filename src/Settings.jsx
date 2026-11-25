@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LogOut, Trash2, Flag, Mail, ChevronRight, Search, Briefcase, Wallet, Scale } from "lucide-react";
+import { LogOut, Trash2, Flag, Mail, ChevronRight, Search, Briefcase, Wallet, Scale, Ban, Wifi, BookOpen } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "./AuthContext";
 import { usePosts } from "./PostsContext";
@@ -8,8 +8,11 @@ import { Sheet, Avatar } from "./ui";
 import { displayName, same } from "./utils";
 import { PANDORA_HELP_EMAIL } from "./pandoraInfo";
 import { BusinessSheet, CreatorSheet, AppealsSheet } from "./GrowthSheets";
+import { BlockedSheet } from "./Safety";
+import { GuidelinesSheet } from "./Guidelines";
+import { useLowData } from "./lowData";
 
-const REASONS = [["spam", "Spam"], ["misinformation", "Misinformation"], ["harassment", "Harassment"], ["sexual", "Sexual content"], ["violence", "Violence"], ["illegal", "Illegal"], ["other", "Other"]];
+const REASONS = [["hate", "Hate speech or discrimination"], ["harassment", "Harassment or bullying"], ["child_safety", "Child safety"], ["violence", "Violence or threats"], ["sexual", "Sexual content"], ["scam", "Scam or fraud"], ["misinformation", "Misinformation"], ["spam", "Spam"], ["illegal", "Illegal activity"], ["other", "Other"]];
 
 // Report a user, or a post by that user.
 // Pass `preset` (a user) to skip the picker, and `post` to report a specific post.
@@ -92,6 +95,7 @@ export function SettingsSheet({ onClose }) {
   const [helpMsg, setHelpMsg] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const { on: dataSaver, setOn: setDataSaver } = useLowData();
 
   const doDelete = async () => {
     setBusy(true);
@@ -107,11 +111,27 @@ export function SettingsSheet({ onClose }) {
   if (view === "business") return <BusinessSheet onClose={onClose} />;
   if (view === "creator") return <CreatorSheet onClose={onClose} />;
   if (view === "appeals") return <AppealsSheet onClose={onClose} />;
+  if (view === "blocked") return <BlockedSheet onClose={onClose} />;
+  if (view === "guidelines") return <GuidelinesSheet onClose={onClose} />;
 
   return (
     <Sheet title={view === "delete" ? "Delete account" : view === "help" ? "Send help message" : "Settings"} onClose={onClose}>
       {view === "menu" && (
         <div className="space-y-2">
+          <div className={`${row} cursor-pointer`} role="switch" aria-checked={dataSaver} onClick={() => setDataSaver(!dataSaver)}>
+            <Wifi size={18} className={t.accentText} />
+            <span className="flex-1">
+              Data saver
+              <span className={`block text-xs font-normal ${t.sub}`}>
+                {dataSaver ? "On: tap a photo or video to load it" : "Off: photos show and videos play automatically"}
+              </span>
+            </span>
+            <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${dataSaver ? "bg-violet-600" : "bg-gray-400/50"}`}>
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${dataSaver ? "left-[22px]" : "left-0.5"}`} />
+            </span>
+          </div>
+          <button className={row} onClick={() => setView("blocked")}><Ban size={18} className={t.accentText} /><span className="flex-1">Blocked &amp; muted</span><ChevronRight size={16} /></button>
+          <button className={row} onClick={() => setView("guidelines")}><BookOpen size={18} className={t.accentText} /><span className="flex-1">Community Guidelines</span><ChevronRight size={16} /></button>
           <button className={row} onClick={() => setView("business")}><Briefcase size={18} className={t.accentText} /><span className="flex-1">Business &amp; promotions</span><ChevronRight size={16} /></button>
           <button className={row} onClick={() => setView("creator")}><Wallet size={18} className={t.accentText} /><span className="flex-1">Creator earnings</span><ChevronRight size={16} /></button>
           <button className={row} onClick={() => setView("appeals")}><Scale size={18} className={t.accentText} /><span className="flex-1">Moderation &amp; appeals</span><ChevronRight size={16} /></button>

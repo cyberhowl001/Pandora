@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { BadgeCheck, Newspaper, ShieldAlert, Megaphone, ExternalLink } from "lucide-react";
+import { BadgeCheck, Newspaper, ShieldAlert, Megaphone, ExternalLink, Star } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { usePosts } from "./PostsContext";
 import { useTheme } from "./theme";
@@ -125,6 +125,15 @@ export function PromoLabel() {
   );
 }
 
+// chosen by the Pandora team from real posts (no paid placement, no changed numbers)
+export function FeaturedLabel() {
+  return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-px rounded-full text-[10px] font-bold bg-violet-500/15 text-violet-500">
+      <Star size={10} fill="currentColor" /> Featured
+    </span>
+  );
+}
+
 export function PromoCTA({ promo, post }) {
   const { openUserSheet } = usePosts();
   if (!promo) return null;
@@ -139,5 +148,23 @@ export function PromoCTA({ promo, post }) {
     <button onClick={go} className="mb-3 w-full rounded-xl py-2.5 text-sm font-bold text-white bg-gradient-to-r from-violet-600 to-blue-600">
       {visit ? (promo.cta_label || "Learn more") : "View profile"}
     </button>
+  );
+}
+
+// On-screen "Pandora" label over photos and videos. Photos that already have the watermark burned in
+// (flag `wm`) are skipped. Videos: top-right, so the player controls stay free.
+// pos="top-center" is used inside the full-screen Media viewer.
+export function Watermark({ file, pos }) {
+  if (!file || file.wm) return null;
+  const video = file.type?.startsWith("video/");
+  const place = pos === "top-center" ? "top-3 left-1/2 -translate-x-1/2" : video ? "top-2 right-2" : "bottom-2 right-2";
+  return (
+    <span
+      aria-hidden
+      className={`pointer-events-none select-none absolute z-[5] ${place} text-[13px] font-black tracking-wide text-white/85`}
+      style={{ textShadow: "0 1px 4px rgba(0,0,0,.7)" }}
+    >
+      Pandora
+    </span>
   );
 }
